@@ -12,6 +12,7 @@ Uses Claude to make a concise title when ANTHROPIC_API_KEY is set; otherwise
 uses the raw text. Reply goes back via the Bot Connector.
 """
 import os, re, unicodedata
+from datetime import date
 import requests
 import asana_client
 from config import MOCK
@@ -89,6 +90,24 @@ def _list_reply(query):
     return "\n".join(lines)
 
 
+# keyword -> workstream category (mirrors the V1 workstreams; default Development)
+_CATS = [
+    (("điện", "electric", "ecu", "power"), "Electrical / ECU"),
+    (("nước", "water"), "Water Treatment"),
+    (("lọc", "purification", "scrubber", "separator"), "Purification"),
+    (("container", "vỏ"), "Container"),
+    (("test", "fat", "kiểm", "validation"), "Test / Validation"),
+    (("lắp", "assembl", "cơ khí", "fabricat", "hàn"), "Fabrication / Assembly"),
+    (("điều khiển", "control", "plc", "scada"), "Controls"),
+]
+def _category(text):
+    t = (text or "").lower()
+    for keys, name in _CATS:
+        if any(k in t for k in keys):
+            return name
+    return "Development"
+
+
 def route(text):
     text = _sanitize(text)
     action, args = _rule_parse(text)
@@ -98,18 +117,26 @@ def route(text):
     if action == "list":
         return _list_reply(args.get("query"))
     if action == "create":
-        title = args.get("title", "Untitled")
+        work = args.get("title", "Untitled")
     else:
         # free-form work-log message (same style the Telegram bot accepts)
         if not _has_real_content(text):
             return (WARN + " Please describe your work in a few words. / "
                     "Vui lòng mô tả công việc cụ thể hơn.")
-        title = _freeform_title(text)
+        work = text
+    # Build the SAME structured format the Telegram bot uses:
+    #   NAME: [<Category>] (Owner - <name>) — <YYYY-MM-DD> (Teams)
+    #   NOTES: the actual work text
+    owner = asana_client.get_me() or "Unassigned"
+    category = _category(work)
+    today = date.today().isoformat()
+    name = "[" + category + "] (Owner - " + owner + ") \u2014 " + today + " (Teams)"
     try:
-        t = asana_client.create_task(title)
+        t = asana_client.create_task(name, notes=work, assignee="me")
     except Exception as e:
         return WARN + " Could not reach Asana, try again. (" + str(e)[:80] + ")"
-    return CHECK + " Created in Asana: " + title + " (#" + str(t["gid"]) + ")"
+    return (CHECK + " Logged to Asana, assigned to " + owner + "\n"
+            + name + "\n\u2192 " + work[:120])
 
 
 def handle_activity(activity):

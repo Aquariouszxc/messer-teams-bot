@@ -26,13 +26,16 @@ def list_tasks():
     return r.json().get("data", [])
 
 def create_task(name, notes="", due_on=None, assignee=None):
+    """assignee: an Asana user gid or the string 'me' (token owner)."""
     if MOCK:
         t = {"gid": str(2000 + len(_MOCK)), "name": name, "completed": False,
-             "assignee": {"name": assignee} if assignee else None, "due_on": due_on, "notes": notes}
+             "assignee": {"name": assignee or "me"} if assignee else None,
+             "due_on": due_on, "notes": notes}
         _MOCK.append(t); return t
-    body = {"data": {"name": name, "notes": notes, "projects": [ASANA_PROJECT_GID]}}
-    if due_on: body["data"]["due_on"] = due_on
-    r = requests.post(f"{BASE}/tasks", headers=_h(), json=body, timeout=15)
+    data = {"name": name, "notes": notes, "projects": [ASANA_PROJECT_GID]}
+    if due_on: data["due_on"] = due_on
+    if assignee: data["assignee"] = assignee
+    r = requests.post(f"{BASE}/tasks", headers=_h(), json={"data": data}, timeout=15)
     r.raise_for_status(); return r.json().get("data", {})
 
 def complete_task(gid):
@@ -49,3 +52,19 @@ def get_task(gid):
     r = requests.get(f"{BASE}/tasks/{gid}", headers=_h(),
                      params={"opt_fields": "name,completed,assignee.name,due_on,notes"}, timeout=15)
     r.raise_for_status(); return r.json().get("data", {})
+
+
+_ME_CACHE = {}
+def get_me():
+    """Return the token owner's display name (cached). Mock returns a placeholder."""
+    if _ME_CACHE.get("name"):
+        return _ME_CACHE["name"]
+    if MOCK:
+        _ME_CACHE["name"] = "Yelin Htet (mock)"; return _ME_CACHE["name"]
+    try:
+        r = requests.get(f"{BASE}/users/me", headers=_h(), params={"opt_fields": "name"}, timeout=15)
+        r.raise_for_status()
+        _ME_CACHE["name"] = r.json().get("data", {}).get("name", "")
+    except Exception:
+        _ME_CACHE["name"] = ""
+    return _ME_CACHE["name"]
