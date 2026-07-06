@@ -80,14 +80,20 @@ def _resolve_user(email):
     return None
 
 
-def create_task(name, notes="", due_on=None, assignee=None):
-    """Signature matches asana_client.create_task so the bot can call either."""
+def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None):
+    """Signature matches asana_client.create_task so the bot can call either.
+    bucket_id (Planner column) and due_on (YYYY-MM-DD) are Planner extras — the bot passes
+    neither, but the schedule importer does."""
     if MOCK:
-        t = {"gid": "p" + str(2000 + len(_MOCK)), "name": name, "completed": False}
+        t = {"gid": "p" + str(2000 + len(_MOCK)), "name": name, "completed": False,
+             "bucket_id": bucket_id}
         _MOCK.append(t); return t
     body = {"planId": _plan_id(), "title": name[:255]}
-    if DEFAULT_BUCKET:
-        body["bucketId"] = DEFAULT_BUCKET
+    bkt = bucket_id or DEFAULT_BUCKET
+    if bkt:
+        body["bucketId"] = bkt
+    if due_on:  # Graph wants an ISO datetime; anchor the date to midnight UTC
+        body["dueDateTime"] = str(due_on)[:10] + "T00:00:00Z"
     email = assignee if (assignee and "@" in assignee) else (DEFAULT_ASSIGNEE or None)
     if email:
         uid = _resolve_user(email)
@@ -129,8 +135,28 @@ def list_tasks():
     out = []
     for t in r.json().get("value", []):
         out.append({"gid": t["id"], "name": t.get("title"),
-                    "completed": (t.get("percentComplete") == 100)})
+                    "completed": (t.get("percentComplete") == 100),
+                    "bucket_id": t.get("bucketId")})
     return out
+
+
+def list_buckets():
+    """Return [{id, name}] for the plan's buckets (Planner columns)."""
+    if MOCK:
+        return []
+    r = requests.get(GRAPH + "/planner/plans/" + _plan_id() + "/buckets", headers=_h(), timeout=20)
+    r.raise_for_status()
+    return [{"id": b["id"], "name": b.get("name")} for b in r.json().get("value", [])]
+
+
+def create_bucket(name):
+    """Create a bucket (column) in the plan and return its id."""
+    if MOCK:
+        return "b" + str(abs(hash(name)) % 10000)
+    body = {"name": name[:255], "planId": _plan_id(), "orderHint": " !"}
+    r = requests.post(GRAPH + "/planner/buckets", headers=_h(), json=body, timeout=20)
+    r.raise_for_status()
+    return r.json()["id"]
 
 
 # ---------------------------------------------------------------------------
