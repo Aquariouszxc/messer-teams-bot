@@ -76,6 +76,36 @@ def _freeform_title(text):
     return text[:120]
 
 
+def _classify_task(text):
+    """BUG-008/002: ask Claude if this is a REAL work task. Returns (valid, reason).
+    Retries once on empty/invalid JSON. Without a key, cannot judge -> (True, '')."""
+    if not ANTHROPIC_API_KEY:
+        return True, ""
+    import json
+    prompt = ("Decide if the message is a REAL work-task update for an engineering project "
+              "(assembly, testing, wiring, installation, etc.). Random characters, gibberish, "
+              "greetings, or non-task chatter are NOT tasks. Reply ONLY JSON: "
+              '{"valid_task": true or false, "reason": "short reason"}.')
+    for _ in range(2):
+        try:
+            r = requests.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 150,
+                      "system": prompt,
+                      "messages": [{"role": "user", "content": text}]}, timeout=20)
+            raw = r.json()["content"][0]["text"].strip()
+            raw = raw[raw.find("{"): raw.rfind("}") + 1]
+            if not raw:
+                continue
+            data = json.loads(raw)
+            return bool(data.get("valid_task")), data.get("reason", "")
+        except Exception:
+            continue
+    # Claude unreachable/garbled -> don't crash, don't log junk; treat as invalid.
+    return False, "Could not validate the task (parser unavailable). Please try again."
+
+
 def _list_reply(query):
     rows = asana_client.list_tasks()
     q = (query or "").lower()
@@ -141,6 +171,13 @@ def route(text):
         if not _has_real_content(text):
             return (WARN + " Please describe your work in a few words. / "
                     "Vui lòng mô tả công việc cụ thể hơn.")
+        # BUG-008: semantic "is this a real task?" gate (Claude)
+        ok, reason = _classify_task(text)
+        if not ok:
+            return (WARN + " Không nhận diện được task. / Could not identify a task.\n"
+                    + (reason and (reason + "\n") or "")
+                    + "Vui lòng mô tả công việc cụ thể hơn. / Please describe your work more specifically.\n"
+                    + 'Ví dụ / Example: "Lắp ráp hệ thống điện, 2 tiếng, done"')
         work = text
     # Build the SAME structured format the Telegram bot uses:
     #   NAME: [<Category>] (Owner - <name>) — <YYYY-MM-DD> (Teams)
