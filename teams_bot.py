@@ -14,7 +14,16 @@ uses the raw text. Reply goes back via the Bot Connector.
 import os, re, unicodedata
 from datetime import date
 import requests
-import asana_client
+import asana_client, planner_client
+from config import DEST
+
+def _hub():
+    """Task destination: Planner if DEST=planner, else Asana. Same interface."""
+    return planner_client if DEST == "planner" else asana_client
+
+
+def _hub_name():
+    return "Planner" if DEST == "planner" else "Asana"
 from config import MOCK
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
@@ -107,7 +116,7 @@ def _classify_task(text):
 
 
 def _list_reply(query):
-    rows = asana_client.list_tasks()
+    rows = _hub().list_tasks()
     q = (query or "").lower()
     if q:
         rows = [r for r in rows if q in (r["name"] or "").lower()]
@@ -160,7 +169,7 @@ def route(text):
     text = _sanitize(text)
     action, args = _rule_parse(text)
     if action == "done":
-        t = asana_client.complete_task(args.get("gid"))
+        t = _hub().complete_task(args.get("gid"))
         return (DONE + " Marked done: " + t["name"]) if t else (WARN + " No task #" + str(args.get("gid")))
     if action == "list":
         return _list_reply(args.get("query"))
@@ -182,15 +191,15 @@ def route(text):
     # Build the SAME structured format the Telegram bot uses:
     #   NAME: [<Category>] (Owner - <name>) — <YYYY-MM-DD> (Teams)
     #   NOTES: the actual work text
-    owner = asana_client.get_me() or "Unassigned"
+    owner = _hub().get_me() or "Unassigned"
     category = _category(owner)
     today = date.today().isoformat()
     name = "[" + category + "] (Owner - " + _owner_label(owner) + ") \u2014 " + today + " (Teams)"
     try:
-        t = asana_client.create_task(name, notes=work, assignee="me")
+        t = _hub().create_task(name, notes=work, assignee="me")
     except Exception as e:
-        return WARN + " Could not reach Asana, try again. (" + str(e)[:80] + ")"
-    return (CHECK + " Logged to Asana, assigned to " + owner + "\n"
+        return WARN + " Could not reach " + _hub_name() + ", try again. (" + str(e)[:80] + ")"
+    return (CHECK + " Logged to " + _hub_name() + ", assigned to " + owner + "\n"
             + name + "\n\u2192 " + work[:120])
 
 

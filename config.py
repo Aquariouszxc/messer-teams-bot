@@ -18,7 +18,9 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "hook").strip()
 TEAMS_WEBHOOK_URL = os.getenv("TEAMS_WEBHOOK_URL", "").strip()
 
 # MOCK = no external calls; prints instead. Auto-on when Asana token missing.
-MOCK = os.getenv("MOCK", "").strip().lower() in ("1", "true", "yes") or not ASANA_TOKEN
+DEST = os.getenv("DEST", "asana").strip().lower()   # asana | planner
+MOCK = os.getenv("MOCK", "").strip().lower() in ("1", "true", "yes") or (
+    not ASANA_TOKEN and not os.getenv("PLANNER_PLAN_ID", "").strip())
 
 # Status mapping between Asana (completed flag + custom field) and our vocabulary
 STATUSES = ["To do", "In progress", "Blocked", "Done"]
