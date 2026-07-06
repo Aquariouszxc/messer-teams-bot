@@ -90,21 +90,39 @@ def _list_reply(query):
     return "\n".join(lines)
 
 
-# keyword -> workstream category (mirrors the V1 workstreams; default Development)
-_CATS = [
-    (("điện", "electric", "ecu", "power"), "Electrical / ECU"),
-    (("nước", "water"), "Water Treatment"),
-    (("lọc", "purification", "scrubber", "separator"), "Purification"),
-    (("container", "vỏ"), "Container"),
-    (("test", "fat", "kiểm", "validation"), "Test / Validation"),
-    (("lắp", "assembl", "cơ khí", "fabricat", "hàn"), "Fabrication / Assembly"),
-    (("điều khiển", "control", "plc", "scada"), "Controls"),
-]
-def _category(text):
-    t = (text or "").lower()
-    for keys, name in _CATS:
-        if any(k in t for k in keys):
-            return name
+# Person-based category (matches the Telegram bot: the OWNER's workstream, not the words).
+# Map the responsible person's name -> their workstream. Extend as Teams users are mapped.
+_OWNER_WS = {
+    "yelin": "Development",          # IT & HML
+    "phuc phillip": "Water Treatment",
+    "hieu": "Electric Power",
+    "nhu": "Separator + Gas Scrubber",
+    "tung": "Purification",
+    "linh": "Container",
+    "tuong": "System Completion",
+    "phuc k": "FAT",
+    "quoc": "Electrolyzer",
+    "john": "Delivery",
+}
+_OWNER_ROLE = {
+    "yelin": "IT & HML",
+    "phuc phillip": "Water Treatment", "hieu": "Electric Power",
+    "nhu": "Separator/Scrubber", "tung": "Purification", "linh": "Container",
+    "tuong": "System Completion", "phuc k": "FAT", "quoc": "Electrolyzer", "john": "Delivery",
+}
+def _owner_label(name):
+    o = (name or "").lower()
+    for key, role in _OWNER_ROLE.items():
+        if key in o:
+            return role
+    return name or "Unassigned"
+
+
+def _category(owner):
+    o = (owner or "").lower()
+    for key, ws in _OWNER_WS.items():
+        if key in o:
+            return ws
     return "Development"
 
 
@@ -128,9 +146,9 @@ def route(text):
     #   NAME: [<Category>] (Owner - <name>) — <YYYY-MM-DD> (Teams)
     #   NOTES: the actual work text
     owner = asana_client.get_me() or "Unassigned"
-    category = _category(work)
+    category = _category(owner)
     today = date.today().isoformat()
-    name = "[" + category + "] (Owner - " + owner + ") \u2014 " + today + " (Teams)"
+    name = "[" + category + "] (Owner - " + _owner_label(owner) + ") \u2014 " + today + " (Teams)"
     try:
         t = asana_client.create_task(name, notes=work, assignee="me")
     except Exception as e:
