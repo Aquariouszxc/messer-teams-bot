@@ -10,6 +10,7 @@ app-only, we switch to the delegated (on-behalf-of) flow. This client isolates a
 """
 import os, time, requests
 from config import MOCK
+# planner client: Graph app-only; supports auto-provisioning the plan (see ensure_plan below)
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 APP_ID = os.getenv("MICROSOFT_APP_ID", "").strip()
@@ -19,6 +20,18 @@ PLAN_ID = os.getenv("PLANNER_PLAN_ID", "").strip()
 DEFAULT_BUCKET = os.getenv("PLANNER_DEFAULT_BUCKET_ID", "").strip()
 DEFAULT_ASSIGNEE = os.getenv("PLANNER_DEFAULT_ASSIGNEE", "").strip()   # optional email
 OWNER_LABEL = os.getenv("PLANNER_OWNER_LABEL", "Team").strip()
+
+# --- auto-provision settings (only used by ensure_plan / create_plan) ---
+# The Plan's home. A Planner Plan MUST hang off an M365 Group, so we find-or-create one.
+GROUP_NAME = os.getenv("PLANNER_GROUP_NAME", "Messer 1MW").strip()
+GROUP_MAILNICK = os.getenv("PLANNER_GROUP_MAILNICK", "messer1mw").strip()
+PLAN_TITLE = os.getenv("PLANNER_PLAN_TITLE", "Messer 1MW — Project Schedule").strip()
+# A user (email) to set as group owner+member. Recommended: app-only groups have no owner,
+# which can make Planner reject plan creation. Set this to your admin/test account.
+GROUP_OWNER = os.getenv("PLANNER_GROUP_OWNER", "").strip()
+
+# PLAN_ID can be discovered at runtime by ensure_plan(); keep it mutable at module level.
+_active_plan = {"id": PLAN_ID}
 
 _MOCK = [{"gid": "p1", "name": "Sample Planner task", "completed": False}]
 _tok = {"v": None, "exp": 0}
@@ -47,6 +60,16 @@ def get_me():
     return OWNER_LABEL  # app-only has no signed-in user; label used only in the task title
 
 
+def _plan_id():
+    """The plan the bot writes to. Prefer an explicit env PLANNER_PLAN_ID; otherwise use whatever
+    ensure_plan() discovered/created this process. Auto-provision on first use if still empty."""
+    if _active_plan["id"]:
+        return _active_plan["id"]
+    if not MOCK:
+        ensure_plan()          # lazy: create the plan the first time a task is logged
+    return _active_plan["id"]
+
+
 def _resolve_user(email):
     try:
         r = requests.get(GRAPH + "/users/" + email + "?$select=id", headers=_h(), timeout=15)
@@ -62,7 +85,7 @@ def create_task(name, notes="", due_on=None, assignee=None):
     if MOCK:
         t = {"gid": "p" + str(2000 + len(_MOCK)), "name": name, "completed": False}
         _MOCK.append(t); return t
-    body = {"planId": PLAN_ID, "title": name[:255]}
+    body = {"planId": _plan_id(), "title": name[:255]}
     if DEFAULT_BUCKET:
         body["bucketId"] = DEFAULT_BUCKET
     email = assignee if (assignee and "@" in assignee) else (DEFAULT_ASSIGNEE or None)
@@ -101,10 +124,128 @@ def complete_task(gid):
 def list_tasks():
     if MOCK:
         return list(_MOCK)
-    r = requests.get(GRAPH + "/planner/plans/" + PLAN_ID + "/tasks", headers=_h(), timeout=20)
+    r = requests.get(GRAPH + "/planner/plans/" + _plan_id() + "/tasks", headers=_h(), timeout=20)
     r.raise_for_status()
     out = []
     for t in r.json().get("value", []):
         out.append({"gid": t["id"], "name": t.get("title"),
                     "completed": (t.get("percentComplete") == 100)})
     return out
+
+
+# ---------------------------------------------------------------------------
+# AUTO-PROVISION: create the Plan (and its M365 Group) from code, no clicking.
+#
+# Why this is needed: a Planner *task* must live in a *Plan*, and a *Plan* must
+# hang off an M365 *Group*. Asana already had its project; Planner starts empty.
+# ensure_plan() does the one-time setup: find-or-create the group, then
+# find-or-create the plan inside it, and remembers the plan id for this process.
+#
+# Graph permissions required (Application, admin-consented on the bot's app):
+#   - Tasks.ReadWrite.All   (create/read Planner tasks & plans)   [already granted]
+#   - Group.ReadWrite.All   (create the group + set its owner)     [add for auto-create]
+#   - Group.Read.All        (find an existing group by name)       [add for find-only]
+# If you'd rather not grant Group.ReadWrite.All, create the group once by hand
+# (or reuse a Team) and pass its id via PLANNER_GROUP_ID — then only the plan is
+# auto-created, which needs just Tasks.ReadWrite.All.
+# ---------------------------------------------------------------------------
+GROUP_ID_ENV = os.getenv("PLANNER_GROUP_ID", "").strip()
+
+
+def find_group(name):
+    """Return the id of an existing M365 group matching displayName, or None."""
+    q = GRAPH + "/groups?$filter=displayName eq '" + name.replace("'", "''") + "'&$select=id,displayName"
+    r = requests.get(q, headers=_h(), timeout=20)
+    if r.ok:
+        vals = r.json().get("value", [])
+        if vals:
+            return vals[0]["id"]
+    return None
+
+
+def create_group(name, mail_nickname, owner_email=None):
+    """Create a Microsoft 365 (Unified) group to host the plan. Optionally add a user as
+    owner+member so Planner accepts plan creation. Returns the new group id."""
+    body = {
+        "displayName": name,
+        "mailEnabled": True,
+        "mailNickname": mail_nickname,
+        "securityEnabled": False,
+        "groupTypes": ["Unified"],
+    }
+    if owner_email:
+        uid = _resolve_user(owner_email)
+        if uid:
+            ref = GRAPH + "/users/" + uid
+            body["owners@odata.bind"] = [ref]
+            body["members@odata.bind"] = [ref]
+    r = requests.post(GRAPH + "/groups", headers=_h(), json=body, timeout=30)
+    r.raise_for_status()
+    gid = r.json()["id"]
+    # Planner backing store can lag a few seconds after group creation.
+    time.sleep(8)
+    return gid
+
+
+def find_plan_in_group(group_id, title):
+    """Return the id of a plan with this title already in the group, or None."""
+    r = requests.get(GRAPH + "/groups/" + group_id + "/planner/plans?$select=id,title",
+                     headers=_h(), timeout=20)
+    if r.ok:
+        for p in r.json().get("value", []):
+            if p.get("title") == title:
+                return p["id"]
+    return None
+
+
+def create_plan(title, group_id):
+    """Create a Planner plan owned by the given group. Tries the modern 'container' shape,
+    then falls back to the legacy 'owner' shape for older tenants. Returns the plan id."""
+    # modern shape (v1.0)
+    body = {"container": {"url": GRAPH + "/groups/" + group_id}, "title": title}
+    r = requests.post(GRAPH + "/planner/plans", headers=_h(), json=body, timeout=30)
+    if r.status_code in (400, 403):
+        # legacy shape (older tenants)
+        r = requests.post(GRAPH + "/planner/plans", headers=_h(),
+                          json={"owner": group_id, "title": title}, timeout=30)
+    r.raise_for_status()
+    return r.json()["id"]
+
+
+def ensure_plan():
+    """Idempotent one-time setup. Returns the plan id and caches it on the module.
+    Order: explicit PLANNER_PLAN_ID > find/create group > find/create plan."""
+    if _active_plan["id"]:
+        return _active_plan["id"]
+
+    gid = GROUP_ID_ENV or find_group(GROUP_NAME)
+    if not gid:
+        print("• group '" + GROUP_NAME + "' not found — creating it")
+        gid = create_group(GROUP_NAME, GROUP_MAILNICK, GROUP_OWNER or None)
+    print("• group id:", gid)
+
+    pid = find_plan_in_group(gid, PLAN_TITLE)
+    if pid:
+        print("• plan already exists:", pid)
+    else:
+        print("• creating plan '" + PLAN_TITLE + "'")
+        pid = create_plan(PLAN_TITLE, gid)
+        print("• plan created:", pid)
+
+    _active_plan["id"] = pid
+    return pid
+
+
+if __name__ == "__main__":
+    # Engineer CLI:  python planner_client.py ensure-plan
+    # Prints the plan id to paste into Railway as PLANNER_PLAN_ID (optional — the bot
+    # will also auto-provision lazily on the first task if the id is left unset).
+    import sys
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "ensure-plan"
+    if cmd == "ensure-plan":
+        print("PLANNER_PLAN_ID=" + ensure_plan())
+    elif cmd == "list":
+        for t in list_tasks():
+            print(t)
+    else:
+        print("usage: python planner_client.py [ensure-plan|list]")
