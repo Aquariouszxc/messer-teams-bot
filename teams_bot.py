@@ -109,7 +109,7 @@ def _list_reply(query):
     if q:
         rows = [r for r in rows if q in (r["name"] or "").lower()]
     if not rows:
-        return "No matching tasks."
+        return "No matching tasks. / Không có task phù hợp."
     lines = []
     for r in rows:
         mark = CHECK if r.get("completed") else BOX
@@ -277,9 +277,10 @@ def _log_new_task(work):
             asana_client.create_task(name, notes=work, assignee="me")
             assigned_to = who
     except Exception as e:
-        return WARN + " Could not reach " + _hub_name() + ", try again. (" + str(e)[:80] + ")"
-    return (CHECK + " New task logged to " + _hub_name() + ", assigned to " + assigned_to + "\n"
-            + name + "\n" + ARROW + work[:120])
+        return (WARN + " Could not reach " + _hub_name() + ", try again. / Không kết nối được "
+                + _hub_name() + ", thử lại. (" + str(e)[:80] + ")")
+    return (CHECK + " New task created / Đã tạo task mới (" + _hub_name()
+            + ") — assigned to / giao cho: " + assigned_to + "\n" + name + "\n" + ARROW + work[:120])
 
 
 def _apply_progress(pend, percent):
@@ -289,10 +290,11 @@ def _apply_progress(pend, percent):
     try:
         _hub().add_progress(gid, work, pct)
     except Exception as e:
-        return WARN + " Could not update, try again. (" + str(e)[:80] + ")"
-    status = "Completed" if pct >= 100 else ("In Progress " + str(pct) + "%")
-    return (CHECK + " Logged to planned task:\n" + ARROW + '"' + name + '"  [' + status + "]\n"
-            + ARROW + work[:120])
+        return WARN + " Could not update, try again. / Không cập nhật được, thử lại. (" + str(e)[:80] + ")"
+    status = ("Completed / Hoàn thành" if pct >= 100
+              else "In Progress / Đang thực hiện " + str(pct) + "%")
+    return (CHECK + " Logged as progress on the planned task / Đã ghi tiến độ cho công việc:\n"
+            + ARROW + '"' + name + '"  [' + status + "]\n" + ARROW + work[:120])
 
 
 def route(text, conv_key="default"):
@@ -320,7 +322,7 @@ def route(text, conv_key="default"):
     action, args = _rule_parse(text)
     if action == "done":
         t = _hub().complete_task(args.get("gid"))
-        return (DONE + " Marked done: " + t["name"]) if t else (WARN + " No task #" + str(args.get("gid")))
+        return (DONE + " Marked done / Đã hoàn thành: " + t["name"]) if t else (WARN + " No task / Không thấy task #" + str(args.get("gid")))
     if action == "list":
         return _list_reply(args.get("query"))
     if action == "create":
@@ -332,10 +334,10 @@ def route(text, conv_key="default"):
                 "Vui lòng mô tả công việc cụ thể hơn.")
     ok, reason = _classify_task(text)
     if not ok:
-        return (WARN + " Không nhận diện được task. / Could not identify a task.\n"
+        return (WARN + " Could not identify a task. / Không nhận diện được task.\n"
                 + (reason and (reason + "\n") or "")
-                + "Vui lòng mô tả công việc cụ thể hơn. / Please describe your work more specifically.\n"
-                + 'Ví dụ / Example: "Lắp ráp hệ thống điện, 2 tiếng, done"')
+                + "Please describe your work more specifically. / Vui lòng mô tả công việc cụ thể hơn.\n"
+                + 'Example / Ví dụ: "Lắp ráp hệ thống điện, 2 tiếng, done"')
     work = text
     m = _match_planned(work)
     if m:
