@@ -21,6 +21,10 @@ from datetime import date
 import requests
 import asana_client, planner_client
 from config import DEST, MOCK
+try:
+    import nudge
+except Exception:
+    nudge = None
 
 
 def _hub():
@@ -283,7 +287,16 @@ def _log_new_task(work):
             + ") — assigned to / giao cho: " + assigned_to + "\n" + name + "\n" + ARROW + work[:120])
 
 
-def _apply_progress(pend, percent):
+def _celebrate(sender):
+    if nudge and sender and sender.get("oid"):
+        try:
+            return nudge.celebrate(sender["oid"], (sender.get("name") or "").split(" ")[0])
+        except Exception:
+            return ""
+    return ""
+
+
+def _apply_progress(pend, percent, sender=None):
     """Log the confirmed update AS PROGRESS on the matched planned task."""
     gid, name, work = pend["gid"], pend["name"], pend["work"]
     pct = percent if percent is not None else 50   # plain 'yes' -> In Progress
@@ -294,7 +307,7 @@ def _apply_progress(pend, percent):
     status = ("Completed / Hoàn thành" if pct >= 100
               else "In Progress / Đang thực hiện " + str(pct) + "%")
     return (CHECK + " Logged as progress on the planned task / Đã ghi tiến độ cho công việc:\n"
-            + ARROW + '"' + name + '"  [' + status + "]\n" + ARROW + work[:120])
+            + ARROW + '"' + name + '"  [' + status + "]\n" + ARROW + work[:120] + _celebrate(sender))
 
 
 GEAR = "🔧"
@@ -434,7 +447,7 @@ def _start_wizard(conv_key, sender):
     return "\n".join(lines)
 
 
-def _wizard_step(pend, text, conv_key):
+def _wizard_step(pend, text, conv_key, sender=None):
     t = _strip(text)
     if any(w in t.split() for w in ("cancel", "huy", "stop", "thoat")):
         PENDING.pop(conv_key, None)
@@ -476,7 +489,7 @@ def _wizard_step(pend, text, conv_key):
         return WARN + " Could not update. / Không cập nhật được. (" + str(e)[:60] + ")"
     status = "Completed / Hoàn thành" if pct >= 100 else "In Progress / Đang thực hiện " + str(pct) + "%"
     return (CHECK + " Logged as progress / Đã ghi tiến độ:\n" + ARROW + '"' + name + '"  [' + status + "]\n"
-            + ARROW + text[:120])
+            + ARROW + text[:120] + _celebrate(sender))
 
 
 def route(text, conv_key="default", sender=None):
@@ -486,11 +499,11 @@ def route(text, conv_key="default", sender=None):
     pend = PENDING.get(conv_key)
     if pend:
         if pend.get("kind") == "wizard":
-            return _wizard_step(pend, text, conv_key)
+            return _wizard_step(pend, text, conv_key, sender)
         verdict, percent = _parse_confirm(text)
         if verdict == "yes":
             PENDING.pop(conv_key, None)
-            return _apply_progress(pend, percent) if pend["kind"] == "link" else _log_new_task(pend["work"])
+            return _apply_progress(pend, percent, sender) if pend["kind"] == "link" else _log_new_task(pend["work"])
         if verdict == "no":
             PENDING.pop(conv_key, None)
             if pend["kind"] == "link":
@@ -550,6 +563,9 @@ def handle_activity(activity):
     frm = activity.get("from", {}) or {}
     conv_key = (activity.get("conversation", {}) or {}).get("id") or frm.get("id") or "default"
     sender = {"oid": frm.get("aadObjectId"), "name": frm.get("name")}
+    if nudge and sender["oid"]:   # remember how to reach this user + they're active now
+        nudge.save_ref(sender["oid"], activity)
+        nudge.note_activity(sender["oid"])
     reply = route(activity.get("text") or "", conv_key, sender)
     _send_reply(activity, reply)
     return reply

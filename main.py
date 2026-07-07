@@ -1,10 +1,24 @@
 """FastAPI service wiring the three tools together. Run: uvicorn main:app --reload"""
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
-import sync, digest, teams_client, telegram_client, teams_bot
+import sync, digest, teams_client, telegram_client, teams_bot, nudge
 from config import WEBHOOK_SECRET, TELEGRAM_CHAT_ID, MOCK
 
 app = FastAPI(title="INDEFOL AI Bot Integration")
+
+
+@app.on_event("startup")
+def _start_nudge_scheduler():
+    if not MOCK:
+        nudge.start_scheduler(300)   # check every 5 min; per-user gating decides who gets pinged
+
+
+@app.get("/nudge")
+def trigger_nudge(key: str = ""):
+    """Manual trigger for testing the friendly nudge run."""
+    if key != WEBHOOK_SECRET:
+        return JSONResponse({"ok": False}, status_code=403)
+    return {"ok": True, "result": nudge.run_nudges()}
 
 @app.get("/healthz")
 def healthz():
