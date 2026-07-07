@@ -25,8 +25,14 @@ START_HOUR = int(os.getenv("NUDGE_START_HOUR", "8"))
 END_HOUR = int(os.getenv("NUDGE_END_HOUR", "17"))
 END_MIN = int(os.getenv("NUDGE_END_MIN", "30"))
 WORK_DAYS = set(int(d) for d in os.getenv("NUDGE_WORK_DAYS", "0,1,2,3,4,5").split(","))  # Mon=0
-GAPS = [15, 30, 45, 60]
-BACKOFF_GAPS = [90, 120, 150]
+# Randomized cadence (minutes). Each person gets an independent random next-ping.
+GAP_MIN = int(os.getenv("NUDGE_GAP_MIN", "20"))
+GAP_MAX = int(os.getenv("NUDGE_GAP_MAX", "90"))
+BACKOFF_MIN = int(os.getenv("NUDGE_BACKOFF_MIN", "120"))   # after being ignored a lot
+BACKOFF_MAX = int(os.getenv("NUDGE_BACKOFF_MAX", "240"))
+INIT_MIN = int(os.getenv("NUDGE_INIT_MIN", "3"))           # random stagger on first enrollment
+INIT_MAX = int(os.getenv("NUDGE_INIT_MAX", "40"))
+MAX_PER_DAY = int(os.getenv("NUDGE_MAX_PER_DAY", "4"))     # never overload one person
 
 MS_APP_ID = os.getenv("MICROSOFT_APP_ID", "").strip()
 MS_APP_PASSWORD = os.getenv("MICROSOFT_APP_PASSWORD", "").strip()
@@ -159,8 +165,8 @@ def _has_open_tasks(oid):
 
 def _schedule_next(s, ts):
     ig = s.get("ignored", 0)
-    gap = random.choice(BACKOFF_GAPS if ig >= 3 else GAPS)
-    s["next_ts"] = ts + gap * 60
+    lo, hi = (BACKOFF_MIN, BACKOFF_MAX) if ig >= 3 else (GAP_MIN, GAP_MAX)
+    s["next_ts"] = ts + random.randint(lo, hi) * 60   # random minutes -> unpredictable
 
 
 def _bot_token():
@@ -194,12 +200,22 @@ def run_nudges(force=False):
     refs = _load(REFS_FILE)
     st = _load(STATE_FILE)
     ts = now.timestamp()
+    today = now.strftime("%Y-%m-%d")
+    items = list(refs.items())
+    random.shuffle(items)                         # random ORDER -> who varies each run
     sent = considered = 0
-    for oid, ref in refs.items():
+    for oid, ref in items:
         s = st.setdefault(oid, {})
-        if s.get("next_ts", 0) > ts:            # not due yet
+        if "next_ts" not in s:
+            if not force:                         # first time -> random stagger, not now
+                s["next_ts"] = ts + random.randint(INIT_MIN, INIT_MAX) * 60
+                continue
+        elif s["next_ts"] > ts:                   # not due yet
             continue
         considered += 1
+        if s.get("nudge_day") == today and s.get("nudge_count", 0) >= MAX_PER_DAY:   # daily cap
+            _schedule_next(s, ts)
+            continue
         if s.get("last_log") and ts - s["last_log"] < 3600:   # logged recently -> don't nag
             _schedule_next(s, ts)
             continue
@@ -211,6 +227,10 @@ def run_nudges(force=False):
             sent += 1
             s["ignored"] = s.get("ignored", 0) + 1
             s["last_nudge"] = ts
+            if s.get("nudge_day") == today:
+                s["nudge_count"] = s.get("nudge_count", 0) + 1
+            else:
+                s["nudge_day"], s["nudge_count"] = today, 1
         _schedule_next(s, ts)
     _save(STATE_FILE, st)
     return "nudges sent: " + str(sent) + " (considered " + str(considered) + ")"
