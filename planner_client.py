@@ -160,6 +160,32 @@ def add_progress(gid, note, percent=None):
     return True
 
 
+def assign_task(gid, email):
+    """Set the assignee on an existing task (idempotent). Returns True if assigned.
+    Needs Graph 'User.Read.All' (Application) to resolve the email -> user id; if that
+    permission isn't granted yet, _resolve_user returns None and we skip (no crash)."""
+    if not email:
+        return False
+    if MOCK:
+        for t in _MOCK:
+            if t["gid"] == str(gid):
+                t["assignee"] = email
+                return True
+        return False
+    uid = _resolve_user(email)
+    if not uid:
+        return False
+    g = requests.get(GRAPH + "/planner/tasks/" + str(gid), headers=_h(), timeout=15)
+    if not g.ok:
+        return False
+    etag = g.json().get("@odata.etag")
+    body = {"assignments": {uid: {"@odata.type": "#microsoft.graph.plannerAssignment",
+                                  "orderHint": " !"}}}
+    r = requests.patch(GRAPH + "/planner/tasks/" + str(gid),
+                       headers=_h({"If-Match": etag}), json=body, timeout=15)
+    return r.ok
+
+
 def list_tasks():
     if MOCK:
         return list(_MOCK)
