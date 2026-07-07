@@ -10,7 +10,7 @@ app = FastAPI(title="INDEFOL AI Bot Integration")
 @app.on_event("startup")
 def _start_nudge_scheduler():
     if not MOCK:
-        nudge.start_scheduler(300)   # check every 5 min; per-user gating decides who gets pinged
+        nudge.start_scheduler(900)   # check every 15 min; per-user random gating decides who gets pinged
 
 
 @app.get("/nudge")
