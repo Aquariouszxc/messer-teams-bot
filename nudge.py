@@ -185,10 +185,11 @@ def _send_proactive(ref, text):
         return False
 
 
-def run_nudges():
-    """Iterate users, apply gating, send friendly nudges. Returns a short summary string."""
+def run_nudges(force=False):
+    """Iterate users, apply gating, send friendly nudges. Returns a short summary string.
+    force=True bypasses the work-hours check (for manual testing)."""
     now = _now_local()
-    if not _in_work_hours(now):
+    if not force and not _in_work_hours(now):
         return "skipped: outside work hours (" + now.strftime("%a %H:%M") + ")"
     refs = _load(REFS_FILE)
     st = _load(STATE_FILE)

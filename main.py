@@ -14,11 +14,11 @@ def _start_nudge_scheduler():
 
 
 @app.get("/nudge")
-def trigger_nudge(key: str = ""):
-    """Manual trigger for testing the friendly nudge run."""
+def trigger_nudge(key: str = "", force: int = 0):
+    """Manual trigger for testing the friendly nudge run. Add &force=1 to bypass work hours."""
     if key != WEBHOOK_SECRET:
         return JSONResponse({"ok": False}, status_code=403)
-    return {"ok": True, "result": nudge.run_nudges()}
+    return {"ok": True, "result": nudge.run_nudges(force=bool(force))}
 
 @app.get("/healthz")
 def healthz():
