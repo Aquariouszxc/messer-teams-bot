@@ -377,6 +377,10 @@ def _query_reply(f, sender):
     if not sel:
         out.append("_No tasks match. / Không có công việc phù hợp._")
         return "\n\n".join(out)
+    try:  # bucket_id -> section name, so ambiguous task names show their phase
+        bmap = {b["id"]: b.get("name") for b in _hub().list_buckets()}
+    except Exception:
+        bmap = {}
     groups = [("overdue", WARN + " Overdue / Quá hạn"),
               ("inprogress", GEAR + " In progress / Đang làm"),
               ("notstarted", BOX + " Not started / Chưa bắt đầu"),
@@ -388,8 +392,8 @@ def _query_reply(f, sender):
             continue
         block = ["**" + title + " (" + str(len(items)) + ")**"]
         for r in items[:15]:
-            due = ("  ·  " + r["due"]) if r.get("due") else ""
-            block.append("- " + (r.get("name") or "") + due)
+            meta = "  ·  ".join(x for x in (bmap.get(r.get("bucket_id")), r.get("due")) if x)
+            block.append("- " + (r.get("name") or "") + (("  ·  " + meta) if meta else ""))
         if len(items) > 15:
             block.append("- _… +" + str(len(items) - 15) + " more_")
         out.append("\n".join(block))
