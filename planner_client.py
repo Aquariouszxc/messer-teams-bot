@@ -159,6 +159,18 @@ def create_bucket(name):
     return r.json()["id"]
 
 
+def bucket_id_for(name):
+    """Return the id of an existing bucket whose name matches (case-insensitive), else None.
+    Used by the Teams bot to drop a chat task into the right phase column."""
+    if MOCK or not name:
+        return None
+    want = name.strip().lower()
+    for b in list_buckets():
+        if (b.get("name") or "").strip().lower() == want:
+            return b["id"]
+    return None
+
+
 # ---------------------------------------------------------------------------
 # AUTO-PROVISION: create the Plan (and its M365 Group) from code, no clicking.
 #

@@ -165,6 +165,49 @@ def _category(owner):
     return "Development"
 
 
+# --- Owner detection from the message itself (Mem1-7 tags or names) --------------
+# Each entry: trigger keys (ascii, accent-free) -> person, workstream label (task title),
+# Planner bucket name (must match the imported schedule bucket), and assignee email.
+_DOMAIN = "@indefolsolar.onmicrosoft.com"
+OWNERS = [
+    {"keys": ["mem1", "phillip"],        "name": "A. Phúc Phillip", "ws": "Water Treatment",
+     "bucket": "WATER TREATMENT",              "email": "mem1.test" + _DOMAIN},
+    {"keys": ["mem2", "hieu"],           "name": "A. Hiệu",         "ws": "Electric Power",
+     "bucket": "ELECTRIC POWER",               "email": "mem2.test" + _DOMAIN},
+    {"keys": ["mem3", "nhu"],            "name": "A. Như",          "ws": "Separator + Gas Scrubber",
+     "bucket": "SEPARRATOR + GAS SCRUBBER",    "email": "mem3.test" + _DOMAIN},
+    {"keys": ["mem4", "tung"],           "name": "Tùng",            "ws": "Purification",
+     "bucket": "PURIFICATION",                 "email": "mem4.test" + _DOMAIN},
+    {"keys": ["mem5", "linh"],           "name": "A. Linh",         "ws": "Container",
+     "bucket": "CONTAINER",                    "email": "mem5.test" + _DOMAIN},
+    {"keys": ["mem6", "tuong"],          "name": "C. Tường",        "ws": "System Completion",
+     "bucket": "HOÀN THIỆN HỆ THỐNG",          "email": "mem6.test" + _DOMAIN},
+    {"keys": ["mem7", "phuc k"],         "name": "Phúc K",          "ws": "FAT",
+     "bucket": "FAT",                          "email": "mem7.test" + _DOMAIN},
+    {"keys": ["quoc", "dao"],            "name": "Quốc Đào",        "ws": "Electrolyzer",
+     "bucket": "ELECTROLYZER",                 "email": "lead.test" + _DOMAIN},
+    {"keys": ["john"],                   "name": "A. John",         "ws": "Delivery",
+     "bucket": "DELIVERY",                     "email": "pm.test" + _DOMAIN},
+]
+
+
+def _strip(s):
+    """Lowercase + drop accents so 'Hiệu' matches 'hieu'."""
+    s = unicodedata.normalize("NFD", (s or "").lower())
+    return "".join(c for c in s if unicodedata.category(c) != "Mn")
+
+
+def detect_owner(text):
+    """Return the OWNERS entry the message is about (first match), or None.
+    Matches whole words so 'lead time' won't hit and 'Mem2' will."""
+    t = _strip(text)
+    for o in OWNERS:
+        for k in o["keys"]:
+            if re.search(r"\b" + re.escape(k) + r"\b", t):
+                return o
+    return None
+
+
 def route(text):
     text = _sanitize(text)
     action, args = _rule_parse(text)
@@ -191,15 +234,29 @@ def route(text):
     # Build the SAME structured format the Telegram bot uses:
     #   NAME: [<Category>] (Owner - <name>) — <YYYY-MM-DD> (Teams)
     #   NOTES: the actual work text
-    owner = _hub().get_me() or "Unassigned"
-    category = _category(owner)
+    # Auto-assign: figure out WHO the task is about from the message (Mem1-7 / names).
+    od = detect_owner(work)
+    if od:
+        category = od["ws"]; role_lbl = od["ws"]; who = od["name"]
+        assignee_email = od["email"]; bucket_name = od["bucket"]
+    else:
+        owner = _hub().get_me() or "Unassigned"
+        category = _category(owner); role_lbl = _owner_label(owner); who = owner
+        assignee_email = None; bucket_name = None
     today = date.today().isoformat()
-    name = "[" + category + "] (Owner - " + _owner_label(owner) + ") \u2014 " + today + " (Teams)"
+    name = "[" + category + "] (Owner - " + role_lbl + ") \u2014 " + today + " (Teams)"
     try:
-        t = _hub().create_task(name, notes=work, assignee="me")
+        if DEST == "planner":
+            bid = planner_client.bucket_id_for(bucket_name) if bucket_name else None
+            planner_client.create_task(name, notes=work, assignee=assignee_email, bucket_id=bid)
+            assigned_to = who if assignee_email else "Team (unassigned)"
+        else:
+            # Asana assignment is by user gid; email won't map, so keep the token owner.
+            asana_client.create_task(name, notes=work, assignee="me")
+            assigned_to = who
     except Exception as e:
         return WARN + " Could not reach " + _hub_name() + ", try again. (" + str(e)[:80] + ")"
-    return (CHECK + " Logged to " + _hub_name() + ", assigned to " + owner + "\n"
+    return (CHECK + " Logged to " + _hub_name() + ", assigned to " + assigned_to + "\n"
             + name + "\n\u2192 " + work[:120])
 
 
