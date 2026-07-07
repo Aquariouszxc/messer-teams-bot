@@ -193,9 +193,13 @@ def list_tasks():
     r.raise_for_status()
     out = []
     for t in r.json().get("value", []):
+        pct = t.get("percentComplete", 0) or 0
+        due = t.get("dueDateTime")
         out.append({"gid": t["id"], "name": t.get("title"),
-                    "completed": (t.get("percentComplete") == 100),
-                    "bucket_id": t.get("bucketId")})
+                    "completed": (pct == 100), "percent": pct,
+                    "bucket_id": t.get("bucketId"),
+                    "due": due[:10] if due else None,
+                    "assignees": list((t.get("assignments") or {}).keys())})
     return out
 
 

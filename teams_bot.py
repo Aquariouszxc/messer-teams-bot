@@ -297,7 +297,97 @@ def _apply_progress(pend, percent):
             + ARROW + '"' + name + '"  [' + status + "]\n" + ARROW + work[:120])
 
 
-def route(text, conv_key="default"):
+GEAR = "🔧"
+_QWORDS = ("what", "which", "show", "list", "how many", "do you", "liet ke", "xem", "cho toi")
+
+
+def _detect_query(text):
+    """Detect a QUESTION about tasks (not a work update). Returns {scope,status} or None."""
+    t = _strip(text)
+    kw = any(k in t for k in (
+        "my task", "my tasks", "assigned to me", "overdue", "past due", "late task",
+        "qua han", "tre han", "status", "tinh trang", "unfinished", "not done", "remaining",
+        "con lai", "chua xong", "in progress", "dang lam", "dang thuc hien", "finished",
+        "completed", "hoan thanh", "not started", "chua bat dau", "cua toi", "viec cua toi",
+        "my progress", "outstanding", "to do", "todo"))
+    task_ctx = any(k in t for k in ("task", "cong viec", "viec", "assignment", "to do", "todo"))
+    has_q = ("?" in text) or any(t.startswith(w) or (" " + w) in t for w in _QWORDS)
+    if not (kw or (has_q and task_ctx)):
+        return None
+    scope = "all" if any(k in t for k in
+                         ("all task", "team", "project", "everyone", "tat ca", "toan bo", "whole")) else "mine"
+    if any(k in t for k in ("overdue", "past due", "late", "qua han", "tre han")):
+        status = "overdue"
+    elif any(k in t for k in ("not started", "chua bat dau")):
+        status = "notstarted"
+    elif any(k in t for k in ("in progress", "dang lam", "dang thuc hien", "ongoing")):
+        status = "inprogress"
+    elif any(k in t for k in ("unfinished", "not done", "open task", "remaining", "con lai",
+                              "chua xong", "left", "outstanding")):
+        status = "open"
+    elif any(k in t for k in ("finished", "completed", "complete", "hoan thanh", "da xong")):
+        status = "completed"
+    else:
+        status = "all"
+    return {"scope": scope, "status": status}
+
+
+def _status_of(r, today):
+    if r.get("completed"):
+        return "completed"
+    if r.get("due") and r["due"] < today:
+        return "overdue"
+    return "inprogress" if (r.get("percent") or 0) >= 1 else "notstarted"
+
+
+def _query_reply(f, sender):
+    try:
+        rows = _hub().list_tasks()
+    except Exception as e:
+        return WARN + " Could not read tasks. / Không đọc được danh sách. (" + str(e)[:60] + ")"
+    who = "everyone / mọi người"
+    if f["scope"] == "mine":
+        oid = sender and sender.get("oid")
+        who = (sender and sender.get("name")) or "you / bạn"
+        if DEST != "planner":
+            return (WARN + " 'My tasks' works on Planner. / 'Việc của tôi' chạy trên Planner.")
+        if not oid:
+            return (WARN + " I couldn't identify you. Message me in the 1:1 bot chat. / "
+                    "Không xác định được bạn.")
+        rows = [r for r in rows if oid in (r.get("assignees") or [])]
+    today = date.today().isoformat()
+    from collections import Counter
+    cnt = Counter(_status_of(r, today) for r in rows)
+    st = f["status"]
+
+    def keep(r):
+        s = _status_of(r, today)
+        if st == "all":
+            return True
+        if st == "open":
+            return s != "completed"
+        return s == st
+    sel = [r for r in rows if keep(r)]
+    header = ("📋 Tasks for " + who + " / Công việc của " + who + "\n"
+              + "Overdue/Quá hạn: %d · In progress/Đang làm: %d · Not started/Chưa: %d · Done/Xong: %d"
+              % (cnt.get("overdue", 0), cnt.get("inprogress", 0),
+                 cnt.get("notstarted", 0), cnt.get("completed", 0)))
+    labels = {"overdue": "OVERDUE / Quá hạn", "inprogress": "IN PROGRESS / Đang làm",
+              "notstarted": "NOT STARTED / Chưa bắt đầu", "completed": "DONE / Đã xong",
+              "open": "OPEN / Chưa xong", "all": "ALL / Tất cả"}
+    if not sel:
+        return header + "\n\n(No tasks match / Không có công việc: " + labels.get(st, st) + ")"
+    emoji = {"completed": CHECK, "overdue": WARN, "inprogress": GEAR, "notstarted": BOX}
+    lines = [header, "", "— " + labels.get(st, st) + " (" + str(len(sel)) + ") —"]
+    for r in sel[:20]:
+        due = (" · due " + r["due"]) if r.get("due") else ""
+        lines.append(emoji.get(_status_of(r, today), BOX) + " " + (r.get("name") or "") + due)
+    if len(sel) > 20:
+        lines.append("… +" + str(len(sel) - 20) + " more / công việc nữa")
+    return "\n".join(lines)
+
+
+def route(text, conv_key="default", sender=None):
     text = _sanitize(text)
 
     # (A) Waiting on a yes/no confirmation from this conversation?
@@ -328,6 +418,11 @@ def route(text, conv_key="default"):
     if action == "create":
         return _log_new_task(args.get("title", "Untitled"))
 
+    # (B2) natural-language QUESTION about tasks (my tasks / overdue / status / ...)
+    qf = _detect_query(text)
+    if qf:
+        return _query_reply(qf, sender)
+
     # (C) free-form work-log update -> validate -> match planned task -> CONFIRM first
     if not _has_real_content(text):
         return (WARN + " Please describe your work in a few words. / "
@@ -354,9 +449,10 @@ def handle_activity(activity):
     """Bot Framework Activity handler. Returns reply text; sends it back to Teams."""
     if activity.get("type") != "message":
         return None
-    conv_key = (activity.get("conversation", {}) or {}).get("id") \
-        or (activity.get("from", {}) or {}).get("id") or "default"
-    reply = route(activity.get("text") or "", conv_key)
+    frm = activity.get("from", {}) or {}
+    conv_key = (activity.get("conversation", {}) or {}).get("id") or frm.get("id") or "default"
+    sender = {"oid": frm.get("aadObjectId"), "name": frm.get("name")}
+    reply = route(activity.get("text") or "", conv_key, sender)
     _send_reply(activity, reply)
     return reply
 
