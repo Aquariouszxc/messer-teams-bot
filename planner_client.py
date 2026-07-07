@@ -127,6 +127,39 @@ def complete_task(gid):
     return {"gid": gid, "name": name, "completed": True}
 
 
+def add_progress(gid, note, percent=None):
+    """Log a chat update AS PROGRESS on an existing (planned) task:
+    append the note to the task's description and set percentComplete.
+    percent: 0-100 (0=not started, 1-99=in progress, 100=complete). Returns True/False."""
+    if MOCK:
+        for t in _MOCK:
+            if t["gid"] == str(gid):
+                t.setdefault("log", []).append(note)
+                if percent is not None:
+                    t["percent"] = percent
+                    t["completed"] = (percent >= 100)
+                return True
+        return False
+    stamp = time.strftime("%Y-%m-%d")
+    # 1) append note to the task details description (needs the details ETag)
+    d = requests.get(GRAPH + "/planner/tasks/" + str(gid) + "/details", headers=_h(), timeout=15)
+    if d.ok:
+        etag = d.json().get("@odata.etag")
+        old = d.json().get("description") or ""
+        new = (old + "\n" if old else "") + "[" + stamp + "] " + note
+        if etag:
+            requests.patch(GRAPH + "/planner/tasks/" + str(gid) + "/details",
+                           headers=_h({"If-Match": etag}), json={"description": new}, timeout=15)
+    # 2) set percentComplete on the task itself (needs the task ETag)
+    if percent is not None:
+        g = requests.get(GRAPH + "/planner/tasks/" + str(gid), headers=_h(), timeout=15)
+        if g.ok:
+            etag = g.json().get("@odata.etag")
+            requests.patch(GRAPH + "/planner/tasks/" + str(gid), headers=_h({"If-Match": etag}),
+                           json={"percentComplete": int(percent)}, timeout=15)
+    return True
+
+
 def list_tasks():
     if MOCK:
         return list(_MOCK)

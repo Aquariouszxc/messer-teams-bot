@@ -38,6 +38,30 @@ def create_task(name, notes="", due_on=None, assignee=None):
     r = requests.post(f"{BASE}/tasks", headers=_h(), json={"data": data}, timeout=15)
     r.raise_for_status(); return r.json().get("data", {})
 
+def add_progress(gid, note, percent=None):
+    """Log a chat update AS PROGRESS on an existing (planned) task: add a comment (story)
+    and, if percent>=100, mark the task complete. (Asana has no native % field, so the
+    percent is written into the comment text.) Returns True/False."""
+    text = note if percent is None else (note + "  [" + str(int(percent)) + "%]")
+    if MOCK:
+        for t in _MOCK:
+            if t["gid"] == str(gid):
+                t.setdefault("log", []).append(text)
+                if percent is not None and percent >= 100:
+                    t["completed"] = True
+                return True
+        return False
+    try:
+        requests.post(f"{BASE}/tasks/{gid}/stories", headers=_h(),
+                      json={"data": {"text": text}}, timeout=15)
+        if percent is not None and percent >= 100:
+            requests.put(f"{BASE}/tasks/{gid}", headers=_h(),
+                         json={"data": {"completed": True}}, timeout=15)
+        return True
+    except Exception:
+        return False
+
+
 def complete_task(gid):
     if MOCK:
         for t in _MOCK:

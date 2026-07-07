@@ -1,21 +1,27 @@
-"""Approach C — Teams inbound handler (+ shared free-form router).
-Teams / Web Chat → parse message → Asana → reply.
+"""Approach C - Teams inbound handler (+ shared free-form router).
+Teams / Web Chat -> parse message -> match a PLANNED task -> confirm -> log progress.
 
 Accepts BOTH:
   - explicit commands:  create task <t> | done <id> | list <kw>
   - free-form work-log text (same style as the Telegram bot), e.g.
-    "Lắp ráp hệ thống điện, 3 tiếng, done"
-so the identical message works in Telegram and Teams.
+    "Lap rap he thong dien, 3 tieng, done"
+
+Flow for a free-form update:
+  1. validate it is a real task (Claude gate),
+  2. match it to one of the planned schedule tasks (Claude),
+  3. ASK the user to confirm (yes / yes done / yes 50% / no),
+  4. only then log it AS PROGRESS on that planned task (comment + percentComplete),
+  or, if nothing matches / user says no, create a NEW standalone task.
 
 Input is sanitized + validated (ports Bug-Tracker fixes 003/004/005/008).
-Uses Claude to make a concise title when ANTHROPIC_API_KEY is set; otherwise
-uses the raw text. Reply goes back via the Bot Connector.
+Reply goes back via the Bot Connector.
 """
 import os, re, unicodedata
 from datetime import date
 import requests
 import asana_client, planner_client
-from config import DEST
+from config import DEST, MOCK
+
 
 def _hub():
     """Task destination: Planner if DEST=planner, else Asana. Same interface."""
@@ -24,17 +30,19 @@ def _hub():
 
 def _hub_name():
     return "Planner" if DEST == "planner" else "Asana"
-from config import MOCK
+
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 MS_APP_ID = os.getenv("MICROSOFT_APP_ID", "").strip()
 MS_APP_PASSWORD = os.getenv("MICROSOFT_APP_PASSWORD", "").strip()
 MS_TENANT_ID = os.getenv("MICROSOFT_APP_TENANT_ID", "").strip()
 
-DONE = "✔️"      # ✔️
-CHECK = "✅"           # ✅
-BOX = "⬜"             # ⬜
-WARN = "⚠️"      # ⚠️
+DONE = "✔️"
+CHECK = "✅"
+BOX = "⬜"
+WARN = "⚠️"
+DASH = " — "
+ARROW = "→ "
 
 
 def _rule_parse(text):
@@ -58,36 +66,17 @@ def _sanitize(text):
 
 _JUNK = {"null", "nil", "none", "undefined", "nan", "n/a", "na", "-", "."}
 
+
 def _has_real_content(text):
-    """BUG-004/005/008: reject junk tokens, and require >=2 letters (blocks '*', emoji-only, blanks)."""
+    """BUG-004/005/008: reject junk tokens, and require >=2 letters."""
     t = (text or "").strip().lower()
     if t in _JUNK:
         return False
     return len(re.sub(r"[^A-Za-zÀ-ỹ]", "", text or "")) >= 2
 
 
-def _freeform_title(text):
-    """Concise Asana title from a work-log sentence. Claude if key set, else raw text."""
-    if ANTHROPIC_API_KEY:
-        try:
-            r = requests.post("https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
-                         "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 120,
-                      "system": ("You turn a worker's task update into a short Asana task "
-                                 "title (max 10 words). Reply with ONLY the title, no quotes."),
-                      "messages": [{"role": "user", "content": text}]}, timeout=20)
-            title = r.json()["content"][0]["text"].strip().strip('"')
-            if title:
-                return title
-        except Exception:
-            pass
-    return text[:120]
-
-
 def _classify_task(text):
-    """BUG-008/002: ask Claude if this is a REAL work task. Returns (valid, reason).
-    Retries once on empty/invalid JSON. Without a key, cannot judge -> (True, '')."""
+    """BUG-008/002: ask Claude if this is a REAL work task. Returns (valid, reason)."""
     if not ANTHROPIC_API_KEY:
         return True, ""
     import json
@@ -111,7 +100,6 @@ def _classify_task(text):
             return bool(data.get("valid_task")), data.get("reason", "")
         except Exception:
             continue
-    # Claude unreachable/garbled -> don't crash, don't log junk; treat as invalid.
     return False, "Could not validate the task (parser unavailable). Please try again."
 
 
@@ -129,26 +117,19 @@ def _list_reply(query):
     return "\n".join(lines)
 
 
-# Person-based category (matches the Telegram bot: the OWNER's workstream, not the words).
-# Map the responsible person's name -> their workstream. Extend as Teams users are mapped.
+# ---- Person-based category (fallback when no planned-task match) -----------------
 _OWNER_WS = {
-    "yelin": "Development",          # IT & HML
-    "phuc phillip": "Water Treatment",
-    "hieu": "Electric Power",
-    "nhu": "Separator + Gas Scrubber",
-    "tung": "Purification",
-    "linh": "Container",
-    "tuong": "System Completion",
-    "phuc k": "FAT",
-    "quoc": "Electrolyzer",
-    "john": "Delivery",
+    "yelin": "Development", "phuc phillip": "Water Treatment", "hieu": "Electric Power",
+    "nhu": "Separator + Gas Scrubber", "tung": "Purification", "linh": "Container",
+    "tuong": "System Completion", "phuc k": "FAT", "quoc": "Electrolyzer", "john": "Delivery",
 }
 _OWNER_ROLE = {
-    "yelin": "IT & HML",
-    "phuc phillip": "Water Treatment", "hieu": "Electric Power",
+    "yelin": "IT & HML", "phuc phillip": "Water Treatment", "hieu": "Electric Power",
     "nhu": "Separator/Scrubber", "tung": "Purification", "linh": "Container",
     "tuong": "System Completion", "phuc k": "FAT", "quoc": "Electrolyzer", "john": "Delivery",
 }
+
+
 def _owner_label(name):
     o = (name or "").lower()
     for key, role in _OWNER_ROLE.items():
@@ -165,41 +146,38 @@ def _category(owner):
     return "Development"
 
 
-# --- Owner detection from the message itself (Mem1-7 tags or names) --------------
-# Each entry: trigger keys (ascii, accent-free) -> person, workstream label (task title),
-# Planner bucket name (must match the imported schedule bucket), and assignee email.
+# ---- Owner detection from the message (Mem1-7 tags or names) ---------------------
 _DOMAIN = "@indefolsolar.onmicrosoft.com"
 OWNERS = [
-    {"keys": ["mem1", "phillip"],        "name": "A. Phúc Phillip", "ws": "Water Treatment",
-     "bucket": "WATER TREATMENT",              "email": "mem1.test" + _DOMAIN},
-    {"keys": ["mem2", "hieu"],           "name": "A. Hiệu",         "ws": "Electric Power",
-     "bucket": "ELECTRIC POWER",               "email": "mem2.test" + _DOMAIN},
-    {"keys": ["mem3", "nhu"],            "name": "A. Như",          "ws": "Separator + Gas Scrubber",
-     "bucket": "SEPARRATOR + GAS SCRUBBER",    "email": "mem3.test" + _DOMAIN},
-    {"keys": ["mem4", "tung"],           "name": "Tùng",            "ws": "Purification",
-     "bucket": "PURIFICATION",                 "email": "mem4.test" + _DOMAIN},
-    {"keys": ["mem5", "linh"],           "name": "A. Linh",         "ws": "Container",
-     "bucket": "CONTAINER",                    "email": "mem5.test" + _DOMAIN},
-    {"keys": ["mem6", "tuong"],          "name": "C. Tường",        "ws": "System Completion",
-     "bucket": "HOÀN THIỆN HỆ THỐNG",          "email": "mem6.test" + _DOMAIN},
-    {"keys": ["mem7", "phuc k"],         "name": "Phúc K",          "ws": "FAT",
-     "bucket": "FAT",                          "email": "mem7.test" + _DOMAIN},
-    {"keys": ["quoc", "dao"],            "name": "Quốc Đào",        "ws": "Electrolyzer",
-     "bucket": "ELECTROLYZER",                 "email": "lead.test" + _DOMAIN},
-    {"keys": ["john"],                   "name": "A. John",         "ws": "Delivery",
-     "bucket": "DELIVERY",                     "email": "pm.test" + _DOMAIN},
+    {"keys": ["mem1", "phillip"], "name": "A. Phuc Phillip", "ws": "Water Treatment",
+     "bucket": "WATER TREATMENT", "email": "mem1.test" + _DOMAIN},
+    {"keys": ["mem2", "hieu"], "name": "A. Hieu", "ws": "Electric Power",
+     "bucket": "ELECTRIC POWER", "email": "mem2.test" + _DOMAIN},
+    {"keys": ["mem3", "nhu"], "name": "A. Nhu", "ws": "Separator + Gas Scrubber",
+     "bucket": "SEPARRATOR + GAS SCRUBBER", "email": "mem3.test" + _DOMAIN},
+    {"keys": ["mem4", "tung"], "name": "Tung", "ws": "Purification",
+     "bucket": "PURIFICATION", "email": "mem4.test" + _DOMAIN},
+    {"keys": ["mem5", "linh"], "name": "A. Linh", "ws": "Container",
+     "bucket": "CONTAINER", "email": "mem5.test" + _DOMAIN},
+    {"keys": ["mem6", "tuong"], "name": "C. Tuong", "ws": "System Completion",
+     "bucket": "HOÀN THIỆN HỆ THỐNG", "email": "mem6.test" + _DOMAIN},
+    {"keys": ["mem7", "phuc k"], "name": "Phuc K", "ws": "FAT",
+     "bucket": "FAT", "email": "mem7.test" + _DOMAIN},
+    {"keys": ["quoc", "dao"], "name": "Quoc Dao", "ws": "Electrolyzer",
+     "bucket": "ELECTROLYZER", "email": "lead.test" + _DOMAIN},
+    {"keys": ["john"], "name": "A. John", "ws": "Delivery",
+     "bucket": "DELIVERY", "email": "pm.test" + _DOMAIN},
 ]
 
 
 def _strip(s):
-    """Lowercase + drop accents so 'Hiệu' matches 'hieu'."""
+    """Lowercase + drop accents so 'Hieu' matches 'Hiệu'."""
     s = unicodedata.normalize("NFD", (s or "").lower())
     return "".join(c for c in s if unicodedata.category(c) != "Mn")
 
 
 def detect_owner(text):
-    """Return the OWNERS entry the message is about (first match), or None.
-    Matches whole words so 'lead time' won't hit and 'Mem2' will."""
+    """Return the OWNERS entry the message is about (first whole-word match), or None."""
     t = _strip(text)
     for o in OWNERS:
         for k in o["keys"]:
@@ -208,33 +186,79 @@ def detect_owner(text):
     return None
 
 
-def route(text):
-    text = _sanitize(text)
-    action, args = _rule_parse(text)
-    if action == "done":
-        t = _hub().complete_task(args.get("gid"))
-        return (DONE + " Marked done: " + t["name"]) if t else (WARN + " No task #" + str(args.get("gid")))
-    if action == "list":
-        return _list_reply(args.get("query"))
-    if action == "create":
-        work = args.get("title", "Untitled")
-    else:
-        # free-form work-log message (same style the Telegram bot accepts)
-        if not _has_real_content(text):
-            return (WARN + " Please describe your work in a few words. / "
-                    "Vui lòng mô tả công việc cụ thể hơn.")
-        # BUG-008: semantic "is this a real task?" gate (Claude)
-        ok, reason = _classify_task(text)
-        if not ok:
-            return (WARN + " Không nhận diện được task. / Could not identify a task.\n"
-                    + (reason and (reason + "\n") or "")
-                    + "Vui lòng mô tả công việc cụ thể hơn. / Please describe your work more specifically.\n"
-                    + 'Ví dụ / Example: "Lắp ráp hệ thống điện, 2 tiếng, done"')
-        work = text
-    # Build the SAME structured format the Telegram bot uses:
-    #   NAME: [<Category>] (Owner - <name>) — <YYYY-MM-DD> (Teams)
-    #   NOTES: the actual work text
-    # Auto-assign: figure out WHO the task is about from the message (Mem1-7 / names).
+# ---- Match a chat update to a PLANNED task, then confirm before logging ----------
+PENDING = {}   # per-conversation short-term memory of what we're waiting to confirm
+
+
+def _planned_candidates():
+    """Planned schedule tasks only - exclude chat-log cards whose names start with '['."""
+    out = []
+    try:
+        for r in _hub().list_tasks():
+            nm = (r.get("name") or "").strip()
+            if nm and not nm.startswith("["):
+                out.append((r["gid"], nm))
+    except Exception:
+        pass
+    return out
+
+
+def _match_planned(work):
+    """Return (gid, name) of the planned task this update is about, or None."""
+    cands = _planned_candidates()
+    if not cands:
+        return None
+    if ANTHROPIC_API_KEY:
+        listing = "\n".join(str(i + 1) + ". " + c[1] for i, c in enumerate(cands))
+        sysmsg = ("You match a worker's update to ONE planned engineering task from the list. "
+                  "Reply ONLY the task number. Reply 0 if none is a clear match.")
+        try:
+            r = requests.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 8, "system": sysmsg,
+                      "messages": [{"role": "user",
+                                    "content": "UPDATE: " + work + "\n\nPLANNED TASKS:\n" + listing}]},
+                timeout=20)
+            raw = r.json()["content"][0]["text"].strip()
+            n = int(re.sub(r"[^0-9]", "", raw) or "0")
+            if 1 <= n <= len(cands):
+                return cands[n - 1]
+            return None
+        except Exception:
+            pass
+    wset = set(_strip(work).split())
+    best, score = None, 0
+    for gid, nm in cands:
+        ov = len(wset & set(_strip(nm).split()))
+        if ov > score:
+            best, score = (gid, nm), ov
+    return best if score >= 2 else None
+
+
+def _parse_confirm(text):
+    """Interpret a confirmation reply -> ('yes', percent|None) | ('no', None) | ('unclear', None)."""
+    t = _strip(text).strip()
+    words = t.split()
+    percent = None
+    m = re.search(r"(\d{1,3})\s*%", t)
+    if any(k in t for k in ("done", "complete", "hoan thanh", "xong")):
+        percent = 100
+    elif m:
+        percent = min(100, int(m.group(1)))
+    yes = any(w in words for w in ("yes", "y", "ok", "oke", "okay", "yeah", "yep", "co", "dung", "ung"))
+    no = any(w in words for w in ("no", "n", "not", "khong", "ko", "cancel", "huy"))
+    if yes and not no:
+        return ("yes", percent)
+    if no and not yes:
+        return ("no", None)
+    if percent is not None and not no:
+        return ("yes", percent)
+    return ("unclear", None)
+
+
+def _log_new_task(work):
+    """Create a NEW standalone task (owner-detected bucket + assignee). Returns reply text."""
     od = detect_owner(work)
     if od:
         category = od["ws"]; role_lbl = od["ws"]; who = od["name"]
@@ -243,28 +267,94 @@ def route(text):
         owner = _hub().get_me() or "Unassigned"
         category = _category(owner); role_lbl = _owner_label(owner); who = owner
         assignee_email = None; bucket_name = None
-    today = date.today().isoformat()
-    name = "[" + category + "] (Owner - " + role_lbl + ") \u2014 " + today + " (Teams)"
+    name = "[" + category + "] (Owner - " + role_lbl + ")" + DASH + date.today().isoformat() + " (Teams)"
     try:
         if DEST == "planner":
             bid = planner_client.bucket_id_for(bucket_name) if bucket_name else None
             planner_client.create_task(name, notes=work, assignee=assignee_email, bucket_id=bid)
             assigned_to = who if assignee_email else "Team (unassigned)"
         else:
-            # Asana assignment is by user gid; email won't map, so keep the token owner.
             asana_client.create_task(name, notes=work, assignee="me")
             assigned_to = who
     except Exception as e:
         return WARN + " Could not reach " + _hub_name() + ", try again. (" + str(e)[:80] + ")"
-    return (CHECK + " Logged to " + _hub_name() + ", assigned to " + assigned_to + "\n"
-            + name + "\n\u2192 " + work[:120])
+    return (CHECK + " New task logged to " + _hub_name() + ", assigned to " + assigned_to + "\n"
+            + name + "\n" + ARROW + work[:120])
+
+
+def _apply_progress(pend, percent):
+    """Log the confirmed update AS PROGRESS on the matched planned task."""
+    gid, name, work = pend["gid"], pend["name"], pend["work"]
+    pct = percent if percent is not None else 50   # plain 'yes' -> In Progress
+    try:
+        _hub().add_progress(gid, work, pct)
+    except Exception as e:
+        return WARN + " Could not update, try again. (" + str(e)[:80] + ")"
+    status = "Completed" if pct >= 100 else ("In Progress " + str(pct) + "%")
+    return (CHECK + " Logged to planned task:\n" + ARROW + '"' + name + '"  [' + status + "]\n"
+            + ARROW + work[:120])
+
+
+def route(text, conv_key="default"):
+    text = _sanitize(text)
+
+    # (A) Waiting on a yes/no confirmation from this conversation?
+    pend = PENDING.get(conv_key)
+    if pend:
+        verdict, percent = _parse_confirm(text)
+        if verdict == "yes":
+            PENDING.pop(conv_key, None)
+            return _apply_progress(pend, percent) if pend["kind"] == "link" else _log_new_task(pend["work"])
+        if verdict == "no":
+            PENDING.pop(conv_key, None)
+            if pend["kind"] == "link":
+                PENDING[conv_key] = {"kind": "new", "work": pend["work"]}
+                return (WARN + " Not that task. Log it as a NEW task instead? (yes/no)\n"
+                        "/ Không phải task đó. Ghi thành task mới? (yes/no)")
+            return "Okay, cancelled - nothing logged. / Đã huỷ, không ghi gì."
+        return (WARN + " Please reply yes or no"
+                + (pend["kind"] == "link" and " (or 'yes done' / 'yes 50%')" or "")
+                + ".\n/ Vui lòng trả lời yes hoặc no.")
+
+    # (B) explicit commands still work
+    action, args = _rule_parse(text)
+    if action == "done":
+        t = _hub().complete_task(args.get("gid"))
+        return (DONE + " Marked done: " + t["name"]) if t else (WARN + " No task #" + str(args.get("gid")))
+    if action == "list":
+        return _list_reply(args.get("query"))
+    if action == "create":
+        return _log_new_task(args.get("title", "Untitled"))
+
+    # (C) free-form work-log update -> validate -> match planned task -> CONFIRM first
+    if not _has_real_content(text):
+        return (WARN + " Please describe your work in a few words. / "
+                "Vui lòng mô tả công việc cụ thể hơn.")
+    ok, reason = _classify_task(text)
+    if not ok:
+        return (WARN + " Không nhận diện được task. / Could not identify a task.\n"
+                + (reason and (reason + "\n") or "")
+                + "Vui lòng mô tả công việc cụ thể hơn. / Please describe your work more specifically.\n"
+                + 'Ví dụ / Example: "Lắp ráp hệ thống điện, 2 tiếng, done"')
+    work = text
+    m = _match_planned(work)
+    if m:
+        PENDING[conv_key] = {"kind": "link", "gid": m[0], "name": m[1], "work": work}
+        return (WARN + " Is this an update to the planned task:\n" + ARROW + '"' + m[1] + '" ?\n'
+                "Reply  yes  (or 'yes done' / 'yes 50%') to log it, or  no.\n"
+                "/ Đây là cập nhật cho công việc trên? Trả lời yes / yes done / yes 50% / no.")
+    PENDING[conv_key] = {"kind": "new", "work": work}
+    return (WARN + " This doesn't match a planned task. Log it as a NEW task? (yes/no)\n"
+            "/ Không khớp công việc kế hoạch nào. Ghi thành task mới? (yes/no)")
 
 
 def handle_activity(activity):
     """Bot Framework Activity handler. Returns reply text; sends it back to Teams."""
     if activity.get("type") != "message":
         return None
-    reply = route(activity.get("text") or "")
+    conv_key = (activity.get("conversation", {}) or {}).get("id") \
+        or (activity.get("from", {}) or {}).get("id") or "default"
+    reply = route(activity.get("text") or "", conv_key)
     _send_reply(activity, reply)
     return reply
 
