@@ -400,12 +400,93 @@ def _query_reply(f, sender):
     return "\n\n".join(out)
 
 
+def _detect_log_intent(text):
+    """User wants to record a contribution but hasn't named the work -> start the wizard."""
+    t = _strip(text)
+    return any(k in t for k in (
+        "help me log", "log my", "want to log", "i want to log", "log it", "log the task",
+        "log a task", "log this", "record my", "record it", "log progress", "log contribution",
+        "update progress", "cap nhat tien do", "ghi nhan", "muon log", "contributed", "contribution",
+        "report my progress", "help me record", "log for me", "help me update"))
+
+
+def _start_wizard(conv_key, sender):
+    if DEST != "planner":
+        return WARN + " This works on Planner. / Chức năng này chạy trên Planner."
+    oid = sender and sender.get("oid")
+    if not oid:
+        return (WARN + " I can't identify you — use the 1:1 bot chat. / "
+                "Không xác định được bạn — dùng chat riêng với bot.")
+    try:
+        rows = _hub().list_tasks()
+    except Exception as e:
+        return WARN + " Could not read tasks. / Không đọc được. (" + str(e)[:50] + ")"
+    mine = [r for r in rows if oid in (r.get("assignees") or []) and not r.get("completed")]
+    if not mine:
+        return CHECK + " You have no open tasks to log. / Bạn không có công việc nào để ghi."
+    mine = sorted(mine, key=lambda r: r.get("due") or "9999")[:15]
+    cands = [(r["gid"], r.get("name") or "") for r in mine]
+    PENDING[conv_key] = {"kind": "wizard", "step": "pick", "cands": cands}
+    lines = [WARN + " Which task do you want to log? Reply with the number. / "
+             "Bạn muốn ghi cho công việc nào? Trả lời số:"]
+    for i, (gid, name) in enumerate(cands, 1):
+        lines.append(str(i) + ". " + name)
+    return "\n".join(lines)
+
+
+def _wizard_step(pend, text, conv_key):
+    t = _strip(text)
+    if any(w in t.split() for w in ("cancel", "huy", "stop", "thoat")):
+        PENDING.pop(conv_key, None)
+        return "Okay, cancelled. / Đã huỷ."
+    if pend["step"] == "pick":
+        cands = pend["cands"]
+        m = re.search(r"\d+", t)
+        idx = None
+        if m:
+            idx = int(m.group()) - 1
+        else:
+            for i, (gid, name) in enumerate(cands):
+                sn = _strip(name)
+                if len(t) >= 3 and (t in sn or sn in t):
+                    idx = i
+                    break
+        if idx is None or not (0 <= idx < len(cands)):
+            return (WARN + " Reply with a task number from the list. / "
+                    "Trả lời bằng số trong danh sách.")
+        pend["task"] = cands[idx]
+        pend["step"] = "describe"
+        PENDING[conv_key] = pend
+        return (CHECK + ' Task: "' + cands[idx][1] + '"\n'
+                "Now tell me what you did and % complete (e.g. 'installed pump, 50%'). / "
+                "Hãy mô tả việc bạn làm và % (vd 'lắp bơm, 50%').")
+    # step == "describe"
+    gid, name = pend["task"]
+    mp = re.search(r"(\d{1,3})\s*%", t)
+    if any(k in t for k in ("done", "complete", "hoan thanh", "xong")):
+        pct = 100
+    elif mp:
+        pct = min(100, int(mp.group(1)))
+    else:
+        pct = 50
+    PENDING.pop(conv_key, None)
+    try:
+        _hub().add_progress(gid, text, pct)
+    except Exception as e:
+        return WARN + " Could not update. / Không cập nhật được. (" + str(e)[:60] + ")"
+    status = "Completed / Hoàn thành" if pct >= 100 else "In Progress / Đang thực hiện " + str(pct) + "%"
+    return (CHECK + " Logged as progress / Đã ghi tiến độ:\n" + ARROW + '"' + name + '"  [' + status + "]\n"
+            + ARROW + text[:120])
+
+
 def route(text, conv_key="default", sender=None):
     text = _sanitize(text)
 
     # (A) Waiting on a yes/no confirmation from this conversation?
     pend = PENDING.get(conv_key)
     if pend:
+        if pend.get("kind") == "wizard":
+            return _wizard_step(pend, text, conv_key)
         verdict, percent = _parse_confirm(text)
         if verdict == "yes":
             PENDING.pop(conv_key, None)
@@ -430,6 +511,10 @@ def route(text, conv_key="default", sender=None):
         return _list_reply(args.get("query"))
     if action == "create":
         return _log_new_task(args.get("title", "Untitled"))
+
+    # (B1) "help me log / record my contribution" -> guided pick-a-task wizard
+    if _detect_log_intent(text):
+        return _start_wizard(conv_key, sender)
 
     # (B2) natural-language QUESTION about tasks (my tasks / overdue / status / ...)
     qf = _detect_query(text)
