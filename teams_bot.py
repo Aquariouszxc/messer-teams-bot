@@ -368,23 +368,32 @@ def _query_reply(f, sender):
             return s != "completed"
         return s == st
     sel = [r for r in rows if keep(r)]
-    header = ("📋 Tasks for " + who + " / Công việc của " + who + "\n"
-              + "Overdue/Quá hạn: %d · In progress/Đang làm: %d · Not started/Chưa: %d · Done/Xong: %d"
-              % (cnt.get("overdue", 0), cnt.get("inprogress", 0),
-                 cnt.get("notstarted", 0), cnt.get("completed", 0)))
-    labels = {"overdue": "OVERDUE / Quá hạn", "inprogress": "IN PROGRESS / Đang làm",
-              "notstarted": "NOT STARTED / Chưa bắt đầu", "completed": "DONE / Đã xong",
-              "open": "OPEN / Chưa xong", "all": "ALL / Tất cả"}
+    # Markdown so Teams renders real line breaks: bold headers + bullet lists, grouped by status.
+    out = ["📋 **Tasks for " + who + "**  ·  " + str(len(sel)) + " shown / hiển thị",
+           ("**Overdue/Quá hạn:** %d  ·  **In progress/Đang làm:** %d  ·  "
+            "**Not started/Chưa:** %d  ·  **Done/Xong:** %d")
+           % (cnt.get("overdue", 0), cnt.get("inprogress", 0),
+              cnt.get("notstarted", 0), cnt.get("completed", 0))]
     if not sel:
-        return header + "\n\n(No tasks match / Không có công việc: " + labels.get(st, st) + ")"
-    emoji = {"completed": CHECK, "overdue": WARN, "inprogress": GEAR, "notstarted": BOX}
-    lines = [header, "", "— " + labels.get(st, st) + " (" + str(len(sel)) + ") —"]
-    for r in sel[:20]:
-        due = (" · due " + r["due"]) if r.get("due") else ""
-        lines.append(emoji.get(_status_of(r, today), BOX) + " " + (r.get("name") or "") + due)
-    if len(sel) > 20:
-        lines.append("… +" + str(len(sel) - 20) + " more / công việc nữa")
-    return "\n".join(lines)
+        out.append("_No tasks match. / Không có công việc phù hợp._")
+        return "\n\n".join(out)
+    groups = [("overdue", WARN + " Overdue / Quá hạn"),
+              ("inprogress", GEAR + " In progress / Đang làm"),
+              ("notstarted", BOX + " Not started / Chưa bắt đầu"),
+              ("completed", CHECK + " Done / Đã xong")]
+    for skey, title in groups:
+        items = sorted([r for r in sel if _status_of(r, today) == skey],
+                       key=lambda r: r.get("due") or "9999")
+        if not items:
+            continue
+        block = ["**" + title + " (" + str(len(items)) + ")**"]
+        for r in items[:15]:
+            due = ("  ·  " + r["due"]) if r.get("due") else ""
+            block.append("- " + (r.get("name") or "") + due)
+        if len(items) > 15:
+            block.append("- _… +" + str(len(items) - 15) + " more_")
+        out.append("\n".join(block))
+    return "\n\n".join(out)
 
 
 def route(text, conv_key="default", sender=None):
@@ -478,7 +487,8 @@ def _send_reply(activity, text):
         conv = activity["conversation"]["id"]
         aid = activity.get("id")
         url = service + "/v3/conversations/" + conv + "/activities" + ("/" + aid if aid else "")
-        reply = {"type": "message", "from": activity.get("recipient"),
+        reply = {"type": "message", "textFormat": "markdown",
+                 "from": activity.get("recipient"),
                  "recipient": activity.get("from"), "text": text,
                  "conversation": activity.get("conversation")}
         requests.post(url, headers={"Authorization": "Bearer " + tok,
