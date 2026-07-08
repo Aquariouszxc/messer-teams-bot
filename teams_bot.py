@@ -16,7 +16,7 @@ Flow for a free-form update:
 Input is sanitized + validated (ports Bug-Tracker fixes 003/004/005/008).
 Reply goes back via the Bot Connector.
 """
-import os, re, unicodedata
+import os, re, time, unicodedata
 from datetime import date
 import requests
 import asana_client, planner_client
@@ -196,6 +196,7 @@ def detect_owner(text):
 
 # ---- Match a chat update to a PLANNED task, then confirm before logging ----------
 PENDING = {}   # per-conversation short-term memory of what we're waiting to confirm
+_SEEN = {}     # activity-id -> ts, to drop duplicate deliveries from Teams retries
 
 
 def _planned_candidates():
@@ -580,6 +581,14 @@ def handle_activity(activity):
     """Bot Framework Activity handler. Returns reply text; sends it back to Teams."""
     if activity.get("type") != "message":
         return None
+    aid = activity.get("id")   # drop duplicate deliveries (Teams retries the same activity id)
+    if aid:
+        now = time.time()
+        for k in [k for k, t in _SEEN.items() if now - t > 120]:
+            _SEEN.pop(k, None)
+        if aid in _SEEN:
+            return None
+        _SEEN[aid] = now
     frm = activity.get("from", {}) or {}
     conv_key = (activity.get("conversation", {}) or {}).get("id") or frm.get("id") or "default"
     sender = {"oid": frm.get("aadObjectId"), "name": frm.get("name")}

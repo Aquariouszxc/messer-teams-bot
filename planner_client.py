@@ -8,7 +8,7 @@ application permission Tasks.ReadWrite.All with admin consent.
 NOTE: Planner app-only permissions are newer/inconsistently documented; if the tenant refuses
 app-only, we switch to the delegated (on-behalf-of) flow. This client isolates all Graph calls.
 """
-import os, time, requests
+import os, time, threading, requests
 from config import MOCK
 # planner client: Graph app-only; supports auto-provisioning the plan (see ensure_plan below)
 
@@ -33,13 +33,13 @@ GROUP_OWNER = os.getenv("PLANNER_GROUP_OWNER", "").strip()
 # PLAN_ID can be discovered at runtime by ensure_plan(); keep it mutable at module level.
 _active_plan = {"id": PLAN_ID}
 
-# Per-request project routing: the bot sets this to the current user's project plan before
-# handling a message, then resets to None (Messer/default). None => behave exactly as before.
-_override_plan = {"id": None}
+# Per-request project routing. Thread-local so concurrent background tasks (Teams messages
+# handled in a thread pool) never race each other's plan. None => behave exactly as before.
+_tls = threading.local()
 
 
 def set_active_plan(pid):
-    _override_plan["id"] = (str(pid).strip() or None) if pid else None
+    _tls.plan = (str(pid).strip() or None) if pid else None
 
 _MOCK = [{"gid": "p1", "name": "Sample Planner task", "completed": False}]
 _tok = {"v": None, "exp": 0}
@@ -71,8 +71,9 @@ def get_me():
 def _plan_id():
     """The plan the bot writes to. Order: per-request override (multi-project routing) >
     explicit env PLANNER_PLAN_ID > whatever ensure_plan() discovered. Auto-provision if empty."""
-    if _override_plan["id"]:
-        return _override_plan["id"]
+    ov = getattr(_tls, "plan", None)
+    if ov:
+        return ov
     if _active_plan["id"]:
         return _active_plan["id"]
     if not MOCK:
@@ -188,11 +189,13 @@ def assign_task(gid, email):
     g = requests.get(GRAPH + "/planner/tasks/" + str(gid), headers=_h(), timeout=15)
     if not g.ok:
         return False
-    etag = g.json().get("@odata.etag")
-    body = {"assignments": {uid: {"@odata.type": "#microsoft.graph.plannerAssignment",
-                                  "orderHint": " !"}}}
+    j = g.json()
+    etag = j.get("@odata.etag")
+    # REPLACE: null any other current assignee(s), keep/add just this one.
+    assigns = {old: None for old in (j.get("assignments") or {}) if old != uid}
+    assigns[uid] = {"@odata.type": "#microsoft.graph.plannerAssignment", "orderHint": " !"}
     r = requests.patch(GRAPH + "/planner/tasks/" + str(gid),
-                       headers=_h({"If-Match": etag}), json=body, timeout=15)
+                       headers=_h({"If-Match": etag}), json={"assignments": assigns}, timeout=15)
     return r.ok
 
 

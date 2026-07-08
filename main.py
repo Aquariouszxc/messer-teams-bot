@@ -1,5 +1,5 @@
 """FastAPI service wiring the three tools together. Run: uvicorn main:app --reload"""
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 import sync, digest, teams_client, telegram_client, teams_bot, nudge
 from config import WEBHOOK_SECRET, TELEGRAM_CHAT_ID, MOCK
@@ -54,10 +54,11 @@ async def asana_webhook(request: Request):
     return {"ok": True}
 
 @app.post("/teams/messages")
-async def teams_messages(request: Request):
-    """Azure Bot posts Teams Activities here (Approach C messaging endpoint)."""
+async def teams_messages(request: Request, background_tasks: BackgroundTasks):
+    """Azure Bot posts Teams Activities here (Approach C messaging endpoint).
+    Ack immediately and process in the background so Teams doesn't retry (= duplicate replies)."""
     activity = await request.json()
-    teams_bot.handle_activity(activity)
+    background_tasks.add_task(teams_bot.handle_activity, activity)
     return {"type": "message"}
 
 @app.get("/digest")
