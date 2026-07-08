@@ -1,0 +1,449 @@
+{
+ "project": "Indefol Hydrogen Mobility",
+ "anchor_start": "2026-07-09",
+ "finish": "2026-09-17",
+ "launch": "2026-09-21",
+ "buffer_days": 4,
+ "tasks": [
+  {
+   "id": "T1",
+   "section": "WS1 Program Mgmt & Bankability",
+   "name": "Charter & flexible WBS sign-off",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-09",
+   "due": "2026-07-14",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T2",
+   "section": "WS1 Program Mgmt & Bankability",
+   "name": "Master schedule + gate calendar (G1/G2/G3)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-14",
+   "due": "2026-07-17",
+   "slack": 58,
+   "critical": false
+  },
+  {
+   "id": "T3",
+   "section": "WS1 Program Mgmt & Bankability",
+   "name": "Risk & assumptions log",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-14",
+   "due": "2026-07-17",
+   "slack": 62,
+   "critical": false
+  },
+  {
+   "id": "T10",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Feasibility research: battery-car H2 hybrid -> G1",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "start": "2026-07-14",
+   "due": "2026-07-28",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T31",
+   "section": "WS7 Feasibility, Options & Gates",
+   "name": "Compare 3 paths (FCEV / H2-ICE / battery-car)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-14",
+   "due": "2026-07-19",
+   "slack": 7,
+   "critical": false
+  },
+  {
+   "id": "T39",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Consolidate 3 BOMs -> master buy-list",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-14",
+   "due": "2026-07-18",
+   "slack": 18,
+   "critical": false
+  },
+  {
+   "id": "T5",
+   "section": "WS1 Program Mgmt & Bankability",
+   "name": "Launch plan (Sep 21)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-17",
+   "due": "2026-07-21",
+   "slack": 58,
+   "critical": false
+  },
+  {
+   "id": "T40",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Send RFQs (H2 tank / FC stack / components)",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-07-18",
+   "due": "2026-07-21",
+   "slack": 18,
+   "critical": false
+  },
+  {
+   "id": "T32",
+   "section": "WS7 Feasibility, Options & Gates",
+   "name": "EKPO vs alternative components cost comparison",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-19",
+   "due": "2026-07-21",
+   "slack": 7,
+   "critical": false
+  },
+  {
+   "id": "T34",
+   "section": "WS7 Feasibility, Options & Gates",
+   "name": "Fallback plan if no-go (truck-retrofit paper study)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-19",
+   "due": "2026-07-21",
+   "slack": 58,
+   "critical": false
+  },
+  {
+   "id": "T43",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Lead-time risk log",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-07-21",
+   "due": "2026-07-24",
+   "slack": 55,
+   "critical": false
+  },
+  {
+   "id": "T33",
+   "section": "WS7 Feasibility, Options & Gates",
+   "name": "G1 decision pack (go / no-go)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-28",
+   "due": "2026-07-30",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T4",
+   "section": "WS1 Program Mgmt & Bankability",
+   "name": "Bankability case (cost / CO2 / financing)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-30",
+   "due": "2026-08-09",
+   "slack": 31,
+   "critical": false
+  },
+  {
+   "id": "T6",
+   "section": "WS2 System Architecture & MRV",
+   "name": "Vehicle-to-cloud (V2C) data architecture",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-30",
+   "due": "2026-08-09",
+   "slack": 10,
+   "critical": false
+  },
+  {
+   "id": "T11",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Concept architecture (FC/H2-ICE + BESS power split)",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "start": "2026-07-30",
+   "due": "2026-08-05",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T26",
+   "section": "WS6 Refuel Station MVP",
+   "name": "Station concept (storage + dispenser + safety)",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-07-30",
+   "due": "2026-08-05",
+   "slack": 30,
+   "critical": false
+  },
+  {
+   "id": "T41",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Budget approval (demo ~$40-56k)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-30",
+   "due": "2026-08-02",
+   "slack": 9,
+   "critical": false
+  },
+  {
+   "id": "T42",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Order short-lead essentials (meter/gateway/regulator)",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-02",
+   "due": "2026-08-04",
+   "slack": 9,
+   "critical": false
+  },
+  {
+   "id": "T44",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Receiving & inspection",
+   "assignee": "minh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-04",
+   "due": "2026-08-14",
+   "slack": 9,
+   "critical": false
+  },
+  {
+   "id": "T12",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Packaging concept (H2 tank placement, CoG, safety)",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-05",
+   "due": "2026-08-11",
+   "slack": 2,
+   "critical": false
+  },
+  {
+   "id": "T13",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Controls & integration plan (PLC/ECU, Modbus/CAN)",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-05",
+   "due": "2026-08-10",
+   "slack": 13,
+   "critical": false
+  },
+  {
+   "id": "T16",
+   "section": "WS4 Powertrain & Fluids",
+   "name": "H2 storage & high-pressure fluid line design",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-05",
+   "due": "2026-08-13",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T17",
+   "section": "WS4 Powertrain & Fluids",
+   "name": "Thermal management (cooling loop)",
+   "assignee": "minh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-05",
+   "due": "2026-08-10",
+   "slack": 5,
+   "critical": false
+  },
+  {
+   "id": "T21",
+   "section": "WS5 Electrical, ECU & IoT",
+   "name": "ECU / hybrid power-split control logic",
+   "assignee": "aung@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-05",
+   "due": "2026-08-11",
+   "slack": 8,
+   "critical": false
+  },
+  {
+   "id": "T27",
+   "section": "WS6 Refuel Station MVP",
+   "name": "P&ID + process design",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-05",
+   "due": "2026-08-10",
+   "slack": 30,
+   "critical": false
+  },
+  {
+   "id": "T7",
+   "section": "WS2 System Architecture & MRV",
+   "name": "MRV extend to vehicle telemetry -> CO2 cert",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-08-09",
+   "due": "2026-08-19",
+   "slack": 10,
+   "critical": false
+  },
+  {
+   "id": "T28",
+   "section": "WS6 Refuel Station MVP",
+   "name": "Dispenser + metering (kg -> MRV)",
+   "assignee": "minh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-10",
+   "due": "2026-08-14",
+   "slack": 34,
+   "critical": false
+  },
+  {
+   "id": "T30",
+   "section": "WS6 Refuel Station MVP",
+   "name": "Station BOM (excl. civil beam/column)",
+   "assignee": "minh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-10",
+   "due": "2026-08-13",
+   "slack": 30,
+   "critical": false
+  },
+  {
+   "id": "T8",
+   "section": "WS2 System Architecture & MRV",
+   "name": "ECU/IoT <-> MRV interface (ICD)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-08-11",
+   "due": "2026-08-15",
+   "slack": 33,
+   "critical": false
+  },
+  {
+   "id": "T22",
+   "section": "WS5 Electrical, ECU & IoT",
+   "name": "Fail-safe & safety-critical routines (H2 isolation)",
+   "assignee": "aung@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-11",
+   "due": "2026-08-15",
+   "slack": 8,
+   "critical": false
+  },
+  {
+   "id": "T23",
+   "section": "WS5 Electrical, ECU & IoT",
+   "name": "Electrical architecture, wiring, PDU, EMI",
+   "assignee": "aung@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-11",
+   "due": "2026-08-16",
+   "slack": 10,
+   "critical": false
+  },
+  {
+   "id": "T18",
+   "section": "WS4 Powertrain & Fluids",
+   "name": "Mechanical packaging + structural mounting",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-13",
+   "due": "2026-08-19",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T19",
+   "section": "WS4 Powertrain & Fluids",
+   "name": "Safety integration (relief / leak / isolation)",
+   "assignee": "minh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-13",
+   "due": "2026-08-17",
+   "slack": 2,
+   "critical": false
+  },
+  {
+   "id": "T24",
+   "section": "WS5 Electrical, ECU & IoT",
+   "name": "Sensor suite (pressure/gas/lambda) on CAN",
+   "assignee": "aung@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-16",
+   "due": "2026-08-19",
+   "slack": 10,
+   "critical": false
+  },
+  {
+   "id": "T29",
+   "section": "WS6 Refuel Station MVP",
+   "name": "Station controls / automation (PLC)",
+   "assignee": "aung@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-16",
+   "due": "2026-08-20",
+   "slack": 28,
+   "critical": false
+  },
+  {
+   "id": "T20",
+   "section": "WS4 Powertrain & Fluids",
+   "name": "CAD + BOM package (ISO/SAE/UNECE)",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-19",
+   "due": "2026-08-23",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T25",
+   "section": "WS5 Electrical, ECU & IoT",
+   "name": "Edge IoT gateway -> telemetry -> MRV",
+   "assignee": "aung@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-19",
+   "due": "2026-08-23",
+   "slack": 10,
+   "critical": false
+  },
+  {
+   "id": "T9",
+   "section": "WS2 System Architecture & MRV",
+   "name": "MRV demo dataset for launch",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-08-23",
+   "due": "2026-08-27",
+   "slack": 10,
+   "critical": false
+  },
+  {
+   "id": "T14",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Demonstrator assembly / integration",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-23",
+   "due": "2026-09-02",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T15",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Proof-of-concept sub-system / bench test",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "start": "2026-09-02",
+   "due": "2026-09-06",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T35",
+   "section": "WS8 Launch Prep (Sep 21)",
+   "name": "Demo script (3 MVPs + bankability)",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-09-06",
+   "due": "2026-09-09",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T36",
+   "section": "WS8 Launch Prep (Sep 21)",
+   "name": "Management / investor deck",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-09-09",
+   "due": "2026-09-12",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T37",
+   "section": "WS8 Launch Prep (Sep 21)",
+   "name": "Documentation package",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-09-12",
+   "due": "2026-09-15",
+   "slack": 0,
+   "critical": true
+  },
+  {
+   "id": "T38",
+   "section": "WS8 Launch Prep (Sep 21)",
+   "name": "Dry-run + G3 launch-readiness review",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-09-15",
+   "due": "2026-09-17",
+   "slack": 0,
+   "critical": true
+  }
+ ]
+}

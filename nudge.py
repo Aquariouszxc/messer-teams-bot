@@ -167,6 +167,109 @@ def _has_open_tasks(oid):
         return False
 
 
+# ---- schedule-aware consequences (baseline, read from CPM computed_*.json) ----------
+_SCHED_FILES = {"h2": os.getenv("H2_COMPUTED_FILE", "computed_h2.json"),
+                "messer": os.getenv("MESSER_COMPUTED_FILE", "computed_messer.json")}
+_sched_cache = {}
+
+
+def _norm(s):
+    return " ".join((s or "").lower().split())
+
+
+def _load_schedule(pkey):
+    if pkey in _sched_cache:
+        return _sched_cache[pkey]
+    data = {"by_name": {}, "buffer": None, "launch": None}
+    try:
+        d = json.load(open(_SCHED_FILES.get(pkey, ""), encoding="utf-8"))
+        data["buffer"] = d.get("buffer_days")
+        data["launch"] = d.get("launch")
+        for t in d.get("tasks", []):
+            data["by_name"][_norm(t.get("name"))] = t
+    except Exception:
+        pass
+    _sched_cache[pkey] = data
+    return data
+
+
+def _launch_label(sched):
+    try:
+        return datetime.date.fromisoformat(sched["launch"]).strftime("%b %d")
+    except Exception:
+        return "launch"
+
+
+def _consequence(info, today, sched):
+    """One warm, schedule-aware sentence (EN / VN). '' if there's nothing useful to add."""
+    if not info:
+        return ""
+    due = datetime.date.fromisoformat(info["due"])
+    d = (due - today).days                       # +ve = days to due, -ve = days late
+    buf = sched.get("buffer")
+    L = _launch_label(sched)
+    name = info["name"]
+    if info.get("critical"):
+        if d < 0:
+            late = -d
+            left = (buf - late) if buf is not None else None
+            if left is not None and left < 0:
+                return (f'⚠️ "{name}" is critical and {late}d overdue — the {L} launch has slipped {-left}d. '
+                        f'Let\'s recover it together. / "{name}" trễ {late} ngày trên đường găng — '
+                        f'mốc {L} đã lùi {-left} ngày. Cùng gỡ nhé.')
+            return (f'🔧 "{name}" is on the critical path and {late}d late — {late} of our {buf}d buffer used '
+                    f'({left}d left). A push today keeps {L} safe. / "{name}" trễ {late} ngày trên đường găng — '
+                    f'đã dùng {late}/{buf} ngày dự phòng (còn {left}). Cố hôm nay để giữ mốc {L}.')
+        if d == 0:
+            return (f'🔧 "{name}" is critical and due today — finishing it keeps the whole {L} launch on track. '
+                    f'How\'s it looking? / "{name}" tới hạn hôm nay và trên đường găng — xong là giữ được mốc {L}. '
+                    f'Tới đâu rồi?')
+        return (f'🔧 Heads-up: "{name}" is on the critical path (no slack), due in {d}d. Each day here moves {L} '
+                f'1:1 — worth protecting. / "{name}" trên đường găng (không dự phòng), còn {d} ngày. '
+                f'Mỗi ngày trễ đẩy mốc {L} đúng 1 ngày.')
+    slack = info.get("slack", 0)
+    if d < 0:
+        late = -d
+        rem = slack - late
+        if rem >= 0:
+            return (f'🌱 "{name}" is {late}d past due but has {slack}d slack — {L} stays safe ({rem}d cushion). '
+                    f'Whenever you can. / "{name}" trễ {late} ngày nhưng còn {slack} ngày dự phòng — '
+                    f'mốc {L} vẫn an toàn (dư {rem}). Khi nào tiện nhé.')
+        return (f'⏰ "{name}" is {late}d late and its {slack}d slack is used up — it now pushes the project '
+                f'{-rem}d. Might be worth flagging. / "{name}" trễ {late} ngày, hết {slack} ngày dự phòng — '
+                f'giờ đẩy dự án {-rem} ngày. Có lẽ nên báo.')
+    return (f'🌱 "{name}" is due in {d}d with {slack}d of buffer — comfortable, no rush. / '
+            f'"{name}" còn {d} ngày, dư {slack} ngày — thoải mái, không vội.')
+
+
+def _urgent_started_task(oid, today_iso):
+    """Most-urgent OPEN + already-STARTED task for a user. Returns (info|None, sched, has_started)."""
+    pkey = projects.get_project_key(oid) if projects else "messer"
+    sched = _load_schedule(pkey)
+    try:
+        mine = [r for r in _hub().list_tasks()
+                if oid in (r.get("assignees") or []) and not r.get("completed")]
+    except Exception:
+        return None, sched, True            # can't read tasks -> let the default nudge proceed
+    if not mine:
+        return None, sched, False
+    today = datetime.date.fromisoformat(today_iso)
+    scored = []
+    for r in mine:
+        info = sched["by_name"].get(_norm(r.get("name")))
+        if info:
+            if today < datetime.date.fromisoformat(info["start"]):
+                continue                    # not started yet -> don't nag about it
+            d = (datetime.date.fromisoformat(info["due"]) - today).days
+            scored.append((d - (100 if info.get("critical") else 0), info))
+        else:
+            scored.append((500, None))      # no schedule data -> low urgency, still nudgeable
+    if not scored:
+        return None, sched, False           # everything is not-started-yet
+    scored.sort(key=lambda x: x[0])
+    return scored[0][1], sched, True
+
+
 def _schedule_next(s, ts):
     ig = s.get("ignored", 0)
     lo, hi = (BACKOFF_MIN, BACKOFF_MAX) if ig >= 3 else (GAP_MIN, GAP_MAX)
@@ -228,10 +331,13 @@ def run_nudges(force=False):
                 planner_client.set_active_plan(projects.plan_id_for(projects.get_project_key(oid)))
             except Exception:
                 pass
-        if not _has_open_tasks(oid):
-            _schedule_next(s, ts)
+        info, sched, has_started = _urgent_started_task(oid, today)
+        if not has_started:
+            _schedule_next(s, ts)          # no open tasks, or none started yet -> skip, no nag
             continue
-        msg = random.choice(MESSAGES).replace("{name}", _first_name(ref))
+        greet = random.choice(MESSAGES).replace("{name}", _first_name(ref))
+        line = _consequence(info, datetime.date.fromisoformat(today), sched)
+        msg = greet + (("\n\n" + line) if line else "")
         if _send_proactive(ref, msg):
             sent += 1
             s["ignored"] = s.get("ignored", 0) + 1
