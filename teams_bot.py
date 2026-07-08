@@ -88,10 +88,14 @@ def _classify_task(text):
     if not ANTHROPIC_API_KEY:
         return True, ""
     import json
-    prompt = ("Decide if the message is a REAL work-task update for an engineering project "
-              "(assembly, testing, wiring, installation, etc.). Random characters, gibberish, "
-              "greetings, or non-task chatter are NOT tasks. Reply ONLY JSON: "
-              '{"valid_task": true or false, "reason": "short reason"}.')
+    prompt = ("Decide if the message is a REAL work update worth logging on a project. "
+              "ACCEPT any genuine professional work the person did or is doing, including: "
+              "engineering (assembly, testing, wiring, installation), design/CAD, planning, "
+              "scheduling, project management / PMO, software or system development, IT setup, "
+              "documentation, research, procurement, coordination, meetings, onboarding, and admin "
+              "that moves the project forward. REJECT ONLY non-work content: random characters, "
+              "gibberish, greetings, or chit-chat with no work described. When in doubt, ACCEPT. "
+              'Reply ONLY JSON: {"valid_task": true or false, "reason": "short reason"}.')
     for _ in range(2):
         try:
             r = requests.post("https://api.anthropic.com/v1/messages",
