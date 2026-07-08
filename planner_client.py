@@ -91,13 +91,13 @@ def _resolve_user(email):
     return None
 
 
-def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None):
+def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None, start_on=None):
     """Signature matches asana_client.create_task so the bot can call either.
-    bucket_id (Planner column) and due_on (YYYY-MM-DD) are Planner extras — the bot passes
-    neither, but the schedule importer does."""
+    bucket_id (Planner column), due_on and start_on (YYYY-MM-DD) are Planner extras — the bot
+    passes none of them, but the CPM schedule importer does."""
     if MOCK:
         t = {"gid": "p" + str(2000 + len(_MOCK)), "name": name, "completed": False,
-             "bucket_id": bucket_id}
+             "bucket_id": bucket_id, "start": start_on, "due": due_on}
         _MOCK.append(t); return t
     body = {"planId": _plan_id(), "title": name[:255]}
     bkt = bucket_id or DEFAULT_BUCKET
@@ -105,6 +105,8 @@ def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None):
         body["bucketId"] = bkt
     if due_on:  # Graph wants an ISO datetime; anchor the date to midnight UTC
         body["dueDateTime"] = str(due_on)[:10] + "T00:00:00Z"
+    if start_on:
+        body["startDateTime"] = str(start_on)[:10] + "T00:00:00Z"
     email = assignee if (assignee and "@" in assignee) else (DEFAULT_ASSIGNEE or None)
     if email:
         uid = _resolve_user(email)
@@ -121,6 +123,34 @@ def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None):
             requests.patch(GRAPH + "/planner/tasks/" + tid + "/details",
                            headers=_h({"If-Match": etag}), json={"description": notes}, timeout=15)
     return {"gid": tid, "name": name}
+
+
+def set_dates(gid, start_on=None, due_on=None):
+    """PATCH start/due on an EXISTING task (CPM schedule sync). Dates = YYYY-MM-DD.
+    Needs the current task ETag (If-Match). Returns True on success."""
+    if not (start_on or due_on):
+        return False
+    if MOCK:
+        for t in _MOCK:
+            if t["gid"] == str(gid):
+                if start_on:
+                    t["start"] = start_on
+                if due_on:
+                    t["due"] = due_on
+                return True
+        return False
+    g = requests.get(GRAPH + "/planner/tasks/" + str(gid), headers=_h(), timeout=15)
+    if not g.ok:
+        return False
+    etag = g.json().get("@odata.etag")
+    body = {}
+    if start_on:
+        body["startDateTime"] = str(start_on)[:10] + "T00:00:00Z"
+    if due_on:
+        body["dueDateTime"] = str(due_on)[:10] + "T00:00:00Z"
+    r = requests.patch(GRAPH + "/planner/tasks/" + str(gid),
+                       headers=_h({"If-Match": etag}), json=body, timeout=15)
+    return r.ok
 
 
 def complete_task(gid):

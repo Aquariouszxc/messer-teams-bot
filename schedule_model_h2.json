@@ -1,6 +1,6 @@
 {
   "project": "Indefol Hydrogen Mobility",
-  "anchor_start": "2026-07-09",
+  "anchor_start": "2026-07-08",
   "launch": "2026-09-21",
   "calendar": "7day",
   "_note": "Single source of truth. dur = duration in calendar days. preds = predecessor task ids (finish-to-start). Start/Due dates are COMPUTED by cpm.py (ES/EF); do not hand-edit dates. Edit dur/preds here, rerun cpm.py, then push to Planner.",
