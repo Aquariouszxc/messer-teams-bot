@@ -33,6 +33,14 @@ GROUP_OWNER = os.getenv("PLANNER_GROUP_OWNER", "").strip()
 # PLAN_ID can be discovered at runtime by ensure_plan(); keep it mutable at module level.
 _active_plan = {"id": PLAN_ID}
 
+# Per-request project routing: the bot sets this to the current user's project plan before
+# handling a message, then resets to None (Messer/default). None => behave exactly as before.
+_override_plan = {"id": None}
+
+
+def set_active_plan(pid):
+    _override_plan["id"] = (str(pid).strip() or None) if pid else None
+
 _MOCK = [{"gid": "p1", "name": "Sample Planner task", "completed": False}]
 _tok = {"v": None, "exp": 0}
 
@@ -61,8 +69,10 @@ def get_me():
 
 
 def _plan_id():
-    """The plan the bot writes to. Prefer an explicit env PLANNER_PLAN_ID; otherwise use whatever
-    ensure_plan() discovered/created this process. Auto-provision on first use if still empty."""
+    """The plan the bot writes to. Order: per-request override (multi-project routing) >
+    explicit env PLANNER_PLAN_ID > whatever ensure_plan() discovered. Auto-provision if empty."""
+    if _override_plan["id"]:
+        return _override_plan["id"]
     if _active_plan["id"]:
         return _active_plan["id"]
     if not MOCK:

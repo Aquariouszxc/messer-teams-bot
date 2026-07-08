@@ -25,6 +25,10 @@ try:
     import nudge
 except Exception:
     nudge = None
+try:
+    import projects
+except Exception:
+    projects = None
 
 
 def _hub():
@@ -495,6 +499,22 @@ def _wizard_step(pend, text, conv_key, sender=None):
 def route(text, conv_key="default", sender=None):
     text = _sanitize(text)
 
+    # (0) project switch: "/project h2" | "/project messer"
+    if projects:
+        mm = re.match(r"^/project\b\s*(\w+)?", text.strip(), re.I)
+        if mm:
+            oid = sender and sender.get("oid")
+            key = projects.resolve_alias(mm.group(1)) if mm.group(1) else None
+            if key:
+                projects.set_project(oid, key)
+                planner_client.set_active_plan(projects.plan_id_for(key))
+                PENDING.pop(conv_key, None)
+                return (CHECK + " Switched to project: " + projects.name_for(key)
+                        + " / Đã chuyển sang dự án: " + projects.name_for(key))
+            cur = projects.name_for(projects.get_project_key(oid)) if oid else "?"
+            return (WARN + " Current project: " + cur
+                    + ". Use  /project h2  or  /project messer.  / Dự án hiện tại: " + cur + ".")
+
     # (A) Waiting on a yes/no confirmation from this conversation?
     pend = PENDING.get(conv_key)
     if pend:
@@ -566,7 +586,16 @@ def handle_activity(activity):
     if nudge and sender["oid"]:   # remember how to reach this user + they're active now
         nudge.save_ref(sender["oid"], activity)
         nudge.note_activity(sender["oid"])
-    reply = route(activity.get("text") or "", conv_key, sender)
+    if projects:                  # route this message to the user's active project's plan
+        try:
+            planner_client.set_active_plan(projects.plan_id_for(projects.get_project_key(sender["oid"])))
+        except Exception:
+            pass
+    try:
+        reply = route(activity.get("text") or "", conv_key, sender)
+    finally:
+        if projects:
+            planner_client.set_active_plan(None)   # reset to default (Messer) after handling
     _send_reply(activity, reply)
     return reply
 

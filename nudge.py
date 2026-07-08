@@ -17,6 +17,10 @@ import os, json, time, random, datetime, threading
 import requests
 from config import DEST
 import planner_client, asana_client
+try:
+    import projects
+except Exception:
+    projects = None
 
 REFS_FILE = os.getenv("NUDGE_REFS_FILE", "conv_refs.json")
 STATE_FILE = os.getenv("NUDGE_STATE_FILE", "nudge_state.json")
@@ -219,6 +223,11 @@ def run_nudges(force=False):
         if s.get("last_log") and ts - s["last_log"] < 3600:   # logged recently -> don't nag
             _schedule_next(s, ts)
             continue
+        if projects:                        # check open tasks in THIS user's active project
+            try:
+                planner_client.set_active_plan(projects.plan_id_for(projects.get_project_key(oid)))
+            except Exception:
+                pass
         if not _has_open_tasks(oid):
             _schedule_next(s, ts)
             continue
@@ -232,6 +241,8 @@ def run_nudges(force=False):
             else:
                 s["nudge_day"], s["nudge_count"] = today, 1
         _schedule_next(s, ts)
+    if projects:
+        planner_client.set_active_plan(None)   # reset to default after the run
     _save(STATE_FILE, st)
     return "nudges sent: " + str(sent) + " (considered " + str(considered) + ")"
 
