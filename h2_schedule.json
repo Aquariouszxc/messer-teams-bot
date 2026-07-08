@@ -1,0 +1,54 @@
+[
+{"section":"WS1 Program Mgmt & Bankability","name":"Charter & flexible WBS sign-off","assignee":"admin@johnlyser.com","due":"2026-07-15","notes":"BKI Indefol Hydrogen Mobility | Yelin (PM/Lead System Architect)"},
+{"section":"WS1 Program Mgmt & Bankability","name":"Master schedule + gate calendar (G1/G2/G3)","assignee":"admin@johnlyser.com","due":"2026-07-18","notes":"Launch Sep 21"},
+{"section":"WS1 Program Mgmt & Bankability","name":"Risk & assumptions log","assignee":"admin@johnlyser.com","due":"2026-07-22","notes":""},
+{"section":"WS1 Program Mgmt & Bankability","name":"Bankability case (cost / CO2 / financing)","assignee":"admin@johnlyser.com","due":"2026-08-29","notes":"BMS bankability"},
+{"section":"WS1 Program Mgmt & Bankability","name":"Launch plan (Sep 21)","assignee":"admin@johnlyser.com","due":"2026-09-05","notes":""},
+
+{"section":"WS2 System Architecture & MRV","name":"Vehicle-to-cloud (V2C) data architecture","assignee":"admin@johnlyser.com","due":"2026-08-05","notes":"CAN -> IoT -> cloud"},
+{"section":"WS2 System Architecture & MRV","name":"MRV extend to vehicle telemetry -> CO2 cert","assignee":"admin@johnlyser.com","due":"2026-08-20","notes":"MRV MVP already built"},
+{"section":"WS2 System Architecture & MRV","name":"ECU/IoT <-> MRV interface (ICD)","assignee":"admin@johnlyser.com","due":"2026-08-25","notes":""},
+{"section":"WS2 System Architecture & MRV","name":"MRV demo dataset for launch","assignee":"admin@johnlyser.com","due":"2026-09-10","notes":""},
+
+{"section":"WS3 Vehicle Conversion (H2 Hybrid Car)","name":"Feasibility research: battery-car H2 hybrid -> G1","assignee":"michel@IndefolSolar.onmicrosoft.com","due":"2026-08-01","notes":"Michel LEAD | feeds Gate G1 go/no-go"},
+{"section":"WS3 Vehicle Conversion (H2 Hybrid Car)","name":"Concept architecture (FC/H2-ICE + BESS power split)","assignee":"michel@IndefolSolar.onmicrosoft.com","due":"2026-08-10","notes":""},
+{"section":"WS3 Vehicle Conversion (H2 Hybrid Car)","name":"Packaging concept (H2 tank placement, CoG, safety)","assignee":"michel@IndefolSolar.onmicrosoft.com","due":"2026-08-18","notes":"Draft concept design sketch (VF e34/VF9 roof tank)"},
+{"section":"WS3 Vehicle Conversion (H2 Hybrid Car)","name":"Controls & integration plan (PLC/ECU, Modbus/CAN)","assignee":"michel@IndefolSolar.onmicrosoft.com","due":"2026-08-25","notes":""},
+{"section":"WS3 Vehicle Conversion (H2 Hybrid Car)","name":"Demonstrator assembly / integration","assignee":"michel@IndefolSolar.onmicrosoft.com","due":"2026-09-08","notes":"All support Michel"},
+{"section":"WS3 Vehicle Conversion (H2 Hybrid Car)","name":"Proof-of-concept sub-system / bench test","assignee":"michel@IndefolSolar.onmicrosoft.com","due":"2026-09-12","notes":""},
+
+{"section":"WS4 Powertrain & Fluids","name":"H2 storage & high-pressure fluid line design","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-08-15","notes":"Fuong LEAD | 350-700 bar, embrittlement-safe"},
+{"section":"WS4 Powertrain & Fluids","name":"Thermal management (cooling loop)","assignee":"ps1.test@IndefolSolar.onmicrosoft.com","due":"2026-08-20","notes":"Minh support"},
+{"section":"WS4 Powertrain & Fluids","name":"Mechanical packaging + structural mounting","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-09-01","notes":""},
+{"section":"WS4 Powertrain & Fluids","name":"Safety integration (relief / leak / isolation)","assignee":"ps1.test@IndefolSolar.onmicrosoft.com","due":"2026-09-05","notes":"Minh"},
+{"section":"WS4 Powertrain & Fluids","name":"CAD + BOM package (ISO/SAE/UNECE)","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-09-08","notes":""},
+
+{"section":"WS5 Electrical, ECU & IoT","name":"ECU / hybrid power-split control logic","assignee":"ps3.test@IndefolSolar.onmicrosoft.com","due":"2026-08-22","notes":"Aung"},
+{"section":"WS5 Electrical, ECU & IoT","name":"Fail-safe & safety-critical routines (H2 isolation)","assignee":"ps3.test@IndefolSolar.onmicrosoft.com","due":"2026-08-28","notes":""},
+{"section":"WS5 Electrical, ECU & IoT","name":"Electrical architecture, wiring, PDU, EMI","assignee":"ps3.test@IndefolSolar.onmicrosoft.com","due":"2026-09-02","notes":""},
+{"section":"WS5 Electrical, ECU & IoT","name":"Sensor suite (pressure/gas/lambda) on CAN","assignee":"ps3.test@IndefolSolar.onmicrosoft.com","due":"2026-09-05","notes":""},
+{"section":"WS5 Electrical, ECU & IoT","name":"Edge IoT gateway -> telemetry -> MRV","assignee":"ps3.test@IndefolSolar.onmicrosoft.com","due":"2026-09-10","notes":""},
+
+{"section":"WS6 Refuel Station MVP","name":"Station concept (storage + dispenser + safety)","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-08-18","notes":"Fuong/Minh; excl. civil"},
+{"section":"WS6 Refuel Station MVP","name":"P&ID + process design","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-08-25","notes":""},
+{"section":"WS6 Refuel Station MVP","name":"Dispenser + metering (kg -> MRV)","assignee":"ps1.test@IndefolSolar.onmicrosoft.com","due":"2026-09-01","notes":"Minh"},
+{"section":"WS6 Refuel Station MVP","name":"Station controls / automation (PLC)","assignee":"ps3.test@IndefolSolar.onmicrosoft.com","due":"2026-09-05","notes":"Aung"},
+{"section":"WS6 Refuel Station MVP","name":"Station BOM (excl. civil beam/column)","assignee":"ps1.test@IndefolSolar.onmicrosoft.com","due":"2026-09-08","notes":"Minh"},
+
+{"section":"WS7 Feasibility, Options & Gates","name":"Compare 3 paths (FCEV / H2-ICE / battery-car)","assignee":"admin@johnlyser.com","due":"2026-07-28","notes":"cost/risk/time/bankability"},
+{"section":"WS7 Feasibility, Options & Gates","name":"EKPO vs alternative components cost comparison","assignee":"admin@johnlyser.com","due":"2026-07-30","notes":""},
+{"section":"WS7 Feasibility, Options & Gates","name":"G1 decision pack (go / no-go)","assignee":"admin@johnlyser.com","due":"2026-08-01","notes":"GATE G1"},
+{"section":"WS7 Feasibility, Options & Gates","name":"Fallback plan if no-go (truck-retrofit paper study)","assignee":"admin@johnlyser.com","due":"2026-08-01","notes":""},
+
+{"section":"WS8 Launch Prep (Sep 21)","name":"Demo script (3 MVPs + bankability)","assignee":"admin@johnlyser.com","due":"2026-09-12","notes":""},
+{"section":"WS8 Launch Prep (Sep 21)","name":"Management / investor deck","assignee":"admin@johnlyser.com","due":"2026-09-14","notes":""},
+{"section":"WS8 Launch Prep (Sep 21)","name":"Documentation package","assignee":"admin@johnlyser.com","due":"2026-09-15","notes":""},
+{"section":"WS8 Launch Prep (Sep 21)","name":"Dry-run + G3 launch-readiness review","assignee":"admin@johnlyser.com","due":"2026-09-17","notes":"GATE G3"},
+
+{"section":"WS9 Procurement & Sourcing","name":"Consolidate 3 BOMs -> master buy-list","assignee":"admin@johnlyser.com","due":"2026-07-20","notes":"done in BOM_v3.xlsx"},
+{"section":"WS9 Procurement & Sourcing","name":"Send RFQs (H2 tank / FC stack / components)","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-07-25","notes":"Fuong; RFQ sheets ready in workbook"},
+{"section":"WS9 Procurement & Sourcing","name":"Budget approval (demo ~$40-56k)","assignee":"admin@johnlyser.com","due":"2026-08-03","notes":""},
+{"section":"WS9 Procurement & Sourcing","name":"Order short-lead essentials (meter/gateway/regulator)","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-08-05","notes":"CRITICAL PATH - order day 1 after G1"},
+{"section":"WS9 Procurement & Sourcing","name":"Lead-time risk log","assignee":"ps2.test@IndefolSolar.onmicrosoft.com","due":"2026-08-08","notes":""},
+{"section":"WS9 Procurement & Sourcing","name":"Receiving & inspection","assignee":"ps1.test@IndefolSolar.onmicrosoft.com","due":"2026-09-01","notes":"Minh"}
+]
