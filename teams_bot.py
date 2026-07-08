@@ -283,7 +283,14 @@ def _short_title(work):
 
 def _log_new_task(work, sender=None):
     """Create a NEW standalone task, TITLED from the work text and assigned to the logger
-    (or the detected owner). Full text goes in the task notes. Returns reply text."""
+    (or the detected owner). Full text goes in the task notes. A trailing '| done' marks it
+    complete (and the calendar event as done). Returns reply text."""
+    work = (work or "").strip()
+    done = False
+    md = re.search(r"\|\s*done\s*$", work, re.I)
+    if md:
+        done = True
+        work = work[:md.start()].strip()
     od = detect_owner(work)
     name = _short_title(work)
     assignee_email = assignee_oid = bucket_name = None
@@ -295,8 +302,13 @@ def _log_new_task(work, sender=None):
     try:
         if DEST == "planner":
             bid = planner_client.bucket_id_for(bucket_name) if bucket_name else None
-            planner_client.create_task(name, notes=work, assignee=assignee_email,
-                                       assignee_oid=assignee_oid, bucket_id=bid)
+            t = planner_client.create_task(name, notes=work, assignee=assignee_email,
+                                           assignee_oid=assignee_oid, bucket_id=bid)
+            if done and t and t.get("gid"):
+                try:
+                    planner_client.complete_task(t["gid"])
+                except Exception:
+                    pass
         else:
             asana_client.create_task(name, notes=work, assignee="me")
     except Exception as e:
@@ -305,11 +317,12 @@ def _log_new_task(work, sender=None):
     user = assignee_oid or assignee_email
     if calendar_sync and user:        # drop a calendar marker on today's log date
         try:
-            calendar_sync.upsert_adhoc(user, name, date.today().isoformat())
+            calendar_sync.upsert_adhoc(user, name, date.today().isoformat(), completed=done)
         except Exception:
             pass
+    tail = "  [✅ done]" if done else ""
     return (CHECK + " New task created / Đã tạo task mới (" + _hub_name()
-            + ") — assigned to / giao cho: " + who + "\n" + ARROW + '"' + name + '"')
+            + ") — assigned to / giao cho: " + who + tail + "\n" + ARROW + '"' + name + '"')
 
 
 try:
