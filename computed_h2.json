@@ -36,14 +36,14 @@
    "critical": false
   },
   {
-   "id": "T10",
-   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
-   "name": "Feasibility research: battery-car H2 hybrid -> G1",
-   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "id": "T39",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Consolidate 3 BOMs -> master buy-list",
+   "assignee": "admin@johnlyser.com",
    "start": "2026-07-13",
-   "due": "2026-07-27",
-   "slack": 0,
-   "critical": true
+   "due": "2026-07-17",
+   "slack": 18,
+   "critical": false
   },
   {
    "id": "T31",
@@ -56,14 +56,14 @@
    "critical": false
   },
   {
-   "id": "T39",
-   "section": "WS9 Procurement & Sourcing",
-   "name": "Consolidate 3 BOMs -> master buy-list",
-   "assignee": "admin@johnlyser.com",
+   "id": "T10",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Feasibility research: battery-car H2 hybrid -> G1",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
    "start": "2026-07-13",
-   "due": "2026-07-17",
-   "slack": 18,
-   "critical": false
+   "due": "2026-07-27",
+   "slack": 0,
+   "critical": true
   },
   {
    "id": "T5",
@@ -126,23 +126,13 @@
    "critical": true
   },
   {
-   "id": "T4",
-   "section": "WS1 Program Mgmt & Bankability",
-   "name": "Bankability case (cost / CO2 / financing)",
+   "id": "T41",
+   "section": "WS9 Procurement & Sourcing",
+   "name": "Budget approval (demo ~$40-56k)",
    "assignee": "admin@johnlyser.com",
    "start": "2026-07-29",
-   "due": "2026-08-08",
-   "slack": 31,
-   "critical": false
-  },
-  {
-   "id": "T6",
-   "section": "WS2 System Architecture & MRV",
-   "name": "Vehicle-to-cloud (V2C) data architecture",
-   "assignee": "admin@johnlyser.com",
-   "start": "2026-07-29",
-   "due": "2026-08-08",
-   "slack": 10,
+   "due": "2026-08-01",
+   "slack": 9,
    "critical": false
   },
   {
@@ -166,13 +156,23 @@
    "critical": false
   },
   {
-   "id": "T41",
-   "section": "WS9 Procurement & Sourcing",
-   "name": "Budget approval (demo ~$40-56k)",
+   "id": "T4",
+   "section": "WS1 Program Mgmt & Bankability",
+   "name": "Bankability case (cost / CO2 / financing)",
    "assignee": "admin@johnlyser.com",
    "start": "2026-07-29",
-   "due": "2026-08-01",
-   "slack": 9,
+   "due": "2026-08-08",
+   "slack": 31,
+   "critical": false
+  },
+  {
+   "id": "T6",
+   "section": "WS2 System Architecture & MRV",
+   "name": "Vehicle-to-cloud (V2C) data architecture",
+   "assignee": "admin@johnlyser.com",
+   "start": "2026-07-29",
+   "due": "2026-08-08",
+   "slack": 10,
    "critical": false
   },
   {
@@ -196,16 +196,6 @@
    "critical": false
   },
   {
-   "id": "T12",
-   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
-   "name": "Packaging concept (H2 tank placement, CoG, safety)",
-   "assignee": "michel@IndefolSolar.onmicrosoft.com",
-   "start": "2026-08-04",
-   "due": "2026-08-10",
-   "slack": 2,
-   "critical": false
-  },
-  {
    "id": "T13",
    "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
    "name": "Controls & integration plan (PLC/ECU, Modbus/CAN)",
@@ -216,16 +206,6 @@
    "critical": false
   },
   {
-   "id": "T16",
-   "section": "WS4 Powertrain & Fluids",
-   "name": "H2 storage & high-pressure fluid line design",
-   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
-   "start": "2026-08-04",
-   "due": "2026-08-12",
-   "slack": 0,
-   "critical": true
-  },
-  {
    "id": "T17",
    "section": "WS4 Powertrain & Fluids",
    "name": "Thermal management (cooling loop)",
@@ -233,16 +213,6 @@
    "start": "2026-08-04",
    "due": "2026-08-09",
    "slack": 5,
-   "critical": false
-  },
-  {
-   "id": "T21",
-   "section": "WS5 Electrical, ECU & IoT",
-   "name": "ECU / hybrid power-split control logic",
-   "assignee": "aung@IndefolSolar.onmicrosoft.com",
-   "start": "2026-08-04",
-   "due": "2026-08-10",
-   "slack": 8,
    "critical": false
   },
   {
@@ -256,6 +226,36 @@
    "critical": false
   },
   {
+   "id": "T12",
+   "section": "WS3 Vehicle Conversion (H2 Hybrid Car)",
+   "name": "Packaging concept (H2 tank placement, CoG, safety)",
+   "assignee": "michel@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-04",
+   "due": "2026-08-10",
+   "slack": 2,
+   "critical": false
+  },
+  {
+   "id": "T21",
+   "section": "WS5 Electrical, ECU & IoT",
+   "name": "ECU / hybrid power-split control logic",
+   "assignee": "aung@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-04",
+   "due": "2026-08-10",
+   "slack": 8,
+   "critical": false
+  },
+  {
+   "id": "T16",
+   "section": "WS4 Powertrain & Fluids",
+   "name": "H2 storage & high-pressure fluid line design",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-04",
+   "due": "2026-08-12",
+   "slack": 0,
+   "critical": true
+  },
+  {
    "id": "T7",
    "section": "WS2 System Architecture & MRV",
    "name": "MRV extend to vehicle telemetry -> CO2 cert",
@@ -266,16 +266,6 @@
    "critical": false
   },
   {
-   "id": "T28",
-   "section": "WS6 Refuel Station MVP",
-   "name": "Dispenser + metering (kg -> MRV)",
-   "assignee": "minh@IndefolSolar.onmicrosoft.com",
-   "start": "2026-08-09",
-   "due": "2026-08-13",
-   "slack": 34,
-   "critical": false
-  },
-  {
    "id": "T30",
    "section": "WS6 Refuel Station MVP",
    "name": "Station BOM (excl. civil beam/column)",
@@ -283,6 +273,16 @@
    "start": "2026-08-09",
    "due": "2026-08-12",
    "slack": 30,
+   "critical": false
+  },
+  {
+   "id": "T28",
+   "section": "WS6 Refuel Station MVP",
+   "name": "Dispenser + metering (kg -> MRV)",
+   "assignee": "minh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-09",
+   "due": "2026-08-13",
+   "slack": 34,
    "critical": false
   },
   {
@@ -316,16 +316,6 @@
    "critical": false
   },
   {
-   "id": "T18",
-   "section": "WS4 Powertrain & Fluids",
-   "name": "Mechanical packaging + structural mounting",
-   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
-   "start": "2026-08-12",
-   "due": "2026-08-18",
-   "slack": 0,
-   "critical": true
-  },
-  {
    "id": "T19",
    "section": "WS4 Powertrain & Fluids",
    "name": "Safety integration (relief / leak / isolation)",
@@ -334,6 +324,16 @@
    "due": "2026-08-16",
    "slack": 2,
    "critical": false
+  },
+  {
+   "id": "T18",
+   "section": "WS4 Powertrain & Fluids",
+   "name": "Mechanical packaging + structural mounting",
+   "assignee": "thanh@IndefolSolar.onmicrosoft.com",
+   "start": "2026-08-12",
+   "due": "2026-08-18",
+   "slack": 0,
+   "critical": true
   },
   {
    "id": "T24",
