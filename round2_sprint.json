@@ -1,0 +1,10 @@
+[
+{"section":"R2 - Round 2 Sprint","name":"Finalize Report + export PDF + submit","assignee":"admin@johnlyser.com","due":"2026-07-12","notes":"Team name, mentor, numbers; export PDF; run challenge sessions; compile Challenge Log; correct file naming; SUBMIT by 12 Jul 11:00"},
+{"section":"R2 - Round 2 Sprint","name":"Build Round 2 Presentation (deck to PDF)","assignee":"admin@johnlyser.com","due":"2026-07-12","notes":"MRV demo + integrated-system narrative + roadmap"},
+{"section":"R2 - Round 2 Sprint","name":"Validate conversion twin params + defend powertrain/EMS","assignee":"michel@IndefolSolar.onmicrosoft.com","due":"2026-07-11","notes":"mass, Cd, FC rating, polarization assumptions; conversion demo script"},
+{"section":"R2 - Round 2 Sprint","name":"Validate station EoS/flow/thermal + P&ID/BOM + demo script","assignee":"thanh@IndefolSolar.onmicrosoft.com","due":"2026-07-11","notes":"assumptions vs literature; pre-cooler ON/OFF thermal-limit demo"},
+{"section":"R2 - Round 2 Sprint","name":"Safety architecture + 85C thermal story + risk section","assignee":"minh@IndefolSolar.onmicrosoft.com","due":"2026-07-11","notes":"interlocks / SIL / HIL / inert commissioning; thermal stress-test"},
+{"section":"R2 - Round 2 Sprint","name":"Battery ECM + controls + telemetry->MRV validate + defend","assignee":"aung@IndefolSolar.onmicrosoft.com","due":"2026-07-11","notes":"Voc / Rint / power limit; defend battery & range challenges; ECU/CAN story"},
+{"section":"R2 - Round 2 Sprint","name":"Run Challenge & Defend rounds + compile Challenge Log","assignee":"admin@johnlyser.com","due":"2026-07-11","notes":"two rounds per section; verdicts Fixed / Roadmapped / Expert-required"},
+{"section":"R2 - Round 2 Sprint","name":"(Optional) Record 2-3 min demo video","assignee":"admin@johnlyser.com","due":"2026-07-12","notes":"MRV + station + conversion demos"}
+]
