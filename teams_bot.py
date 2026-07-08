@@ -302,6 +302,12 @@ def _log_new_task(work, sender=None):
     except Exception as e:
         return (WARN + " Could not reach " + _hub_name() + ", try again. / Không kết nối được "
                 + _hub_name() + ", thử lại. (" + str(e)[:80] + ")")
+    user = assignee_oid or assignee_email
+    if calendar_sync and user:        # drop a calendar marker on today's log date
+        try:
+            calendar_sync.upsert_adhoc(user, name, date.today().isoformat())
+        except Exception:
+            pass
     return (CHECK + " New task created / Đã tạo task mới (" + _hub_name()
             + ") — assigned to / giao cho: " + who + "\n" + ARROW + '"' + name + '"')
 

@@ -113,6 +113,39 @@ def update_progress(name, percent=None, completed=None):
     return r.ok
 
 
+def upsert_adhoc(user, name, day, completed=False):
+    """Create/refresh a single all-day calendar event for an AD-HOC logged task (one created
+    via the bot's `create task:`, not part of the CPM schedule). Placed on `day` (the log date).
+    user = email OR directory oid — Graph /users/{user}/events accepts either. No-op in MOCK."""
+    if getattr(pc, "MOCK", False) or not user:
+        return False
+    m = _load_map()
+    key = "ADHOC|%s|%s" % (name, user)
+    end_excl = (datetime.date.fromisoformat(day) + datetime.timedelta(days=1)).isoformat()
+    subject = ("✅ [%s] %s — DONE" % (PROJECT_TAG, name)) if completed else "[%s] %s" % (PROJECT_TAG, name)
+    body = {"subject": subject, "isAllDay": True, "showAs": "free",
+            "start": {"dateTime": day + "T00:00:00", "timeZone": TZ},
+            "end": {"dateTime": end_excl + "T00:00:00", "timeZone": TZ},
+            "categories": ["Hydrogen Mobility"] + (["Completed"] if completed else [])}
+    import requests
+    rec = m.get(key)
+    if rec is not None:
+        r = requests.patch(pc.GRAPH + "/users/" + user + "/events/" + _eid(rec),
+                           headers=pc._h(), json=body, timeout=20)
+        if r.ok:
+            m[key] = {"id": _eid(rec), "name": name, "email": user}
+            _save_map(m)
+            return True
+        if r.status_code == 404:
+            m.pop(key, None)
+    r = requests.post(pc.GRAPH + "/users/" + user + "/events", headers=pc._h(), json=body, timeout=20)
+    if r.ok:
+        m[key] = {"id": r.json().get("id"), "name": name, "email": user}
+        _save_map(m)
+        return True
+    return False
+
+
 def sync(dry=False):
     comp = json.load(open(COMPUTED, encoding="utf-8"))
     m = _load_map()
