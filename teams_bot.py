@@ -292,6 +292,21 @@ def _log_new_task(work):
             + ") — assigned to / giao cho: " + assigned_to + "\n" + name + "\n" + ARROW + work[:120])
 
 
+try:
+    import calendar_sync
+except Exception:
+    calendar_sync = None
+
+
+def _cal_progress(name, pct):
+    """After a log, reflect progress/completion on the task's Outlook calendar event."""
+    if calendar_sync:
+        try:
+            calendar_sync.update_progress(name, pct)
+        except Exception:
+            pass
+
+
 def _celebrate(sender):
     if nudge and sender and sender.get("oid"):
         try:
@@ -309,6 +324,7 @@ def _apply_progress(pend, percent, sender=None):
         _hub().add_progress(gid, work, pct)
     except Exception as e:
         return WARN + " Could not update, try again. / Không cập nhật được, thử lại. (" + str(e)[:80] + ")"
+    _cal_progress(name, pct)
     status = ("Completed / Hoàn thành" if pct >= 100
               else "In Progress / Đang thực hiện " + str(pct) + "%")
     return (CHECK + " Logged as progress on the planned task / Đã ghi tiến độ cho công việc:\n"
@@ -492,6 +508,7 @@ def _wizard_step(pend, text, conv_key, sender=None):
         _hub().add_progress(gid, text, pct)
     except Exception as e:
         return WARN + " Could not update. / Không cập nhật được. (" + str(e)[:60] + ")"
+    _cal_progress(name, pct)
     status = "Completed / Hoàn thành" if pct >= 100 else "In Progress / Đang thực hiện " + str(pct) + "%"
     return (CHECK + " Logged as progress / Đã ghi tiến độ:\n" + ARROW + '"' + name + '"  [' + status + "]\n"
             + ARROW + text[:120] + _celebrate(sender))

@@ -55,23 +55,62 @@ def _event_body(t):
     }
 
 
-def _sync_one(email, key, body, m, dry):
+def _eid(rec):
+    return rec.get("id") if isinstance(rec, dict) else rec
+
+
+def _sync_one(email, key, t, body, m, dry):
     url_base = pc.GRAPH + "/users/" + email + "/events"
     if dry:
-        act = "update" if key in m else "create"
-        return act
+        return "update" if key in m else "create"
     import requests
-    if key in m:
-        r = requests.patch(url_base + "/" + m[key], headers=pc._h(), json=body, timeout=20)
-        if r.status_code == 404:               # event was deleted -> recreate
+    rec = m.get(key)
+    if rec is not None:
+        r = requests.patch(url_base + "/" + _eid(rec), headers=pc._h(), json=body, timeout=20)
+        if r.status_code == 404:               # event was deleted -> recreate below
             m.pop(key, None)
         elif r.ok:
+            m[key] = {"id": _eid(rec), "name": t["name"], "email": email}
             return "updated"
     r = requests.post(url_base, headers=pc._h(), json=body, timeout=20)
     if r.ok:
-        m[key] = r.json().get("id")
+        m[key] = {"id": r.json().get("id"), "name": t["name"], "email": email}
         return "created"
     return "failed:%s" % r.status_code
+
+
+def _norm(s):
+    return " ".join((s or "").lower().split())
+
+
+def update_progress(name, percent=None, completed=None):
+    """Called by the bot AFTER a log: reflect progress/completion on the task's calendar
+    event. Matches by task name across tracked events. No-op in MOCK / if not found."""
+    if getattr(pc, "MOCK", False):
+        return False
+    m = _load_map()
+    hit = None
+    for rec in m.values():
+        if isinstance(rec, dict) and _norm(rec.get("name")) == _norm(name):
+            hit = rec
+            break
+    if not hit or not hit.get("id"):
+        return False
+    done = bool(completed) or (percent is not None and percent >= 100)
+    base = "[%s] %s" % (PROJECT_TAG, name)
+    if done:
+        subject = "✅ " + base + " — DONE"
+    elif percent:
+        subject = "[%d%%] %s" % (int(percent), base)
+    else:
+        subject = base
+    patch = {"subject": subject}
+    if done:
+        patch["categories"] = ["Hydrogen Mobility", "Completed"]
+    import requests
+    r = requests.patch(pc.GRAPH + "/users/" + hit["email"] + "/events/" + hit["id"],
+                       headers=pc._h(), json=patch, timeout=20)
+    return r.ok
 
 
 def sync(dry=False):
@@ -83,7 +122,7 @@ def sync(dry=False):
         if not email or "@" not in email:
             continue
         key = "%s|%s|%s" % (PROJECT_TAG, t["id"], email)
-        res = _sync_one(email, key, _event_body(t), m, dry)
+        res = _sync_one(email, key, t, _event_body(t), m, dry)
         counts[res] = counts.get(res, 0) + 1
     if not dry:
         _save_map(m)
