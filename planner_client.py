@@ -91,7 +91,8 @@ def _resolve_user(email):
     return None
 
 
-def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None, start_on=None):
+def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None, start_on=None,
+                assignee_oid=None):
     """Signature matches asana_client.create_task so the bot can call either.
     bucket_id (Planner column), due_on and start_on (YYYY-MM-DD) are Planner extras — the bot
     passes none of them, but the CPM schedule importer does."""
@@ -107,12 +108,14 @@ def create_task(name, notes="", due_on=None, assignee=None, bucket_id=None, star
         body["dueDateTime"] = str(due_on)[:10] + "T00:00:00Z"
     if start_on:
         body["startDateTime"] = str(start_on)[:10] + "T00:00:00Z"
-    email = assignee if (assignee and "@" in assignee) else (DEFAULT_ASSIGNEE or None)
-    if email:
-        uid = _resolve_user(email)
-        if uid:
-            body["assignments"] = {uid: {"@odata.type": "#microsoft.graph.plannerAssignment",
-                                         "orderHint": " !"}}
+    uid = assignee_oid                       # assign directly by directory id if given
+    if not uid:
+        email = assignee if (assignee and "@" in assignee) else (DEFAULT_ASSIGNEE or None)
+        if email:
+            uid = _resolve_user(email)
+    if uid:
+        body["assignments"] = {uid: {"@odata.type": "#microsoft.graph.plannerAssignment",
+                                     "orderHint": " !"}}
     r = requests.post(GRAPH + "/planner/tasks", headers=_h(), json=body, timeout=20)
     r.raise_for_status()
     tid = r.json()["id"]

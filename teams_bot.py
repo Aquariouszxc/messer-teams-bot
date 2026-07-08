@@ -270,30 +270,40 @@ def _parse_confirm(text):
     return ("unclear", None)
 
 
-def _log_new_task(work):
-    """Create a NEW standalone task (owner-detected bucket + assignee). Returns reply text."""
+def _short_title(work):
+    """A readable task title from the work text (first clause, <=80 chars)."""
+    t = " ".join((work or "").split())
+    for sep in (" — ", " - ", ". ", ": "):
+        i = t.find(sep, 0, 90)
+        if i > 0:
+            t = t[:i]
+            break
+    return (t[:80]).strip() or "New task"
+
+
+def _log_new_task(work, sender=None):
+    """Create a NEW standalone task, TITLED from the work text and assigned to the logger
+    (or the detected owner). Full text goes in the task notes. Returns reply text."""
     od = detect_owner(work)
+    name = _short_title(work)
+    assignee_email = assignee_oid = bucket_name = None
+    who = "Team (unassigned)"
     if od:
-        category = od["ws"]; role_lbl = od["ws"]; who = od["name"]
-        assignee_email = od["email"]; bucket_name = od["bucket"]
-    else:
-        owner = _hub().get_me() or "Unassigned"
-        category = _category(owner); role_lbl = _owner_label(owner); who = owner
-        assignee_email = None; bucket_name = None
-    name = "[" + category + "] (Owner - " + role_lbl + ")" + DASH + date.today().isoformat() + " (Teams)"
+        assignee_email = od["email"]; bucket_name = od["bucket"]; who = od["name"]
+    elif sender and sender.get("oid"):
+        assignee_oid = sender["oid"]; who = (sender.get("name") or "you").split(" ")[0]
     try:
         if DEST == "planner":
             bid = planner_client.bucket_id_for(bucket_name) if bucket_name else None
-            planner_client.create_task(name, notes=work, assignee=assignee_email, bucket_id=bid)
-            assigned_to = who if assignee_email else "Team (unassigned)"
+            planner_client.create_task(name, notes=work, assignee=assignee_email,
+                                       assignee_oid=assignee_oid, bucket_id=bid)
         else:
             asana_client.create_task(name, notes=work, assignee="me")
-            assigned_to = who
     except Exception as e:
         return (WARN + " Could not reach " + _hub_name() + ", try again. / Không kết nối được "
                 + _hub_name() + ", thử lại. (" + str(e)[:80] + ")")
     return (CHECK + " New task created / Đã tạo task mới (" + _hub_name()
-            + ") — assigned to / giao cho: " + assigned_to + "\n" + name + "\n" + ARROW + work[:120])
+            + ") — assigned to / giao cho: " + who + "\n" + ARROW + '"' + name + '"')
 
 
 try:
@@ -545,7 +555,7 @@ def route(text, conv_key="default", sender=None):
         verdict, percent = _parse_confirm(text)
         if verdict == "yes":
             PENDING.pop(conv_key, None)
-            return _apply_progress(pend, percent, sender) if pend["kind"] == "link" else _log_new_task(pend["work"])
+            return _apply_progress(pend, percent, sender) if pend["kind"] == "link" else _log_new_task(pend["work"], sender)
         if verdict == "no":
             PENDING.pop(conv_key, None)
             if pend["kind"] == "link":
@@ -565,7 +575,7 @@ def route(text, conv_key="default", sender=None):
     if action == "list":
         return _list_reply(args.get("query"))
     if action == "create":
-        return _log_new_task(args.get("title", "Untitled"))
+        return _log_new_task(args.get("title", "Untitled"), sender)
 
     # (B1) "help me log / record my contribution" -> guided pick-a-task wizard
     if _detect_log_intent(text):
