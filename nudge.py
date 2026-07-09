@@ -204,6 +204,18 @@ def _consequence(info, today, sched):
     """One warm, schedule-aware sentence (EN / VN). '' if there's nothing useful to add."""
     if not info:
         return ""
+    if info.get("plain"):                        # task not in the CPM schedule -> rank by its own due date
+        due = info.get("due")
+        if not due:
+            return ""
+        d = (datetime.date.fromisoformat(due) - today).days
+        name = info["name"]
+        if d < 0:
+            return f'⏰ "{name}" is {-d}d past due — worth closing. / "{name}" trễ {-d} ngày — nên hoàn tất.'
+        if d == 0:
+            return f'⏰ "{name}" is due TODAY — a hard deadline. / "{name}" tới hạn HÔM NAY — hạn chót.'
+        return (f'📌 "{name}" is due in {d}d — a hard deadline worth prioritising. / '
+                f'"{name}" còn {d} ngày — hạn chót cần ưu tiên.')
     due = datetime.date.fromisoformat(info["due"])
     d = (due - today).days                       # +ve = days to due, -ve = days late
     buf = sched.get("buffer")
@@ -261,9 +273,14 @@ def _urgent_started_task(oid, today_iso):
             if today < datetime.date.fromisoformat(info["start"]):
                 continue                    # not started yet -> don't nag about it
             d = (datetime.date.fromisoformat(info["due"]) - today).days
-            scored.append((d - (100 if info.get("critical") else 0), info))
+            scored.append((d - (0.1 if info.get("critical") else 0), info))  # soonest due wins; critical only breaks same-day ties
         else:
-            scored.append((500, None))      # no schedule data -> low urgency, still nudgeable
+            due = (r.get("due") or "")[:10]     # non-CPM task -> rank by its own Planner due date
+            try:
+                d = (datetime.date.fromisoformat(due) - today).days if due else 900
+            except Exception:
+                d = 900
+            scored.append((d, {"name": r.get("name"), "due": due or None, "plain": True}))
     if not scored:
         return None, sched, False           # everything is not-started-yet
     scored.sort(key=lambda x: x[0])
